@@ -1,0 +1,34 @@
+{
+  "CRM": {
+    "access": true,
+    "details": "42 modules"
+  },
+  "Books": {
+    "access": true,
+    "details": "0 organizations"
+  },
+  "Projects": {
+    "access": false,
+    "error": "{\"error\":{\"code\":6891,\"message\":\"Given URL is wrong\"}}\n"
+  },
+  "Desk": {
+    "access": "requires_config",
+    "details": "Need Desk Org ID"
+  },
+  "Analytics": {
+    "access": true,
+    "details": "0 workspaces"
+  },
+  "People": {
+    "access": true,
+    "details": "3 employees"
+  },
+  "Inventory": {
+    "access": "requires_config",
+    "details": "Need Organization ID"
+  },
+  "Recruit": {
+    "access": false,
+    "error": "<html><head><title>Zoho CRM - Error</title><link rel=\"SHORTCUT ICON\" href=\"https&#x3a;&#x2f;&#x2f;st"
+  }
+}

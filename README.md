@@ -1,4 +1,4 @@
-# Zoho CRM MCP Server
+# Zoho Ecosystem MCP Server
 
 <div align="center">
 
@@ -12,21 +12,50 @@
 
 ---
 
-A comprehensive **Model Context Protocol (MCP) server** for seamless integration with Zoho CRM. This server enables AI assistants like Claude to interact with your Zoho CRM data through a secure, OAuth-based authentication system.
+A comprehensive **Model Context Protocol (MCP) server** for seamless integration with **40+ Zoho applications**. This server enables AI assistants like Claude to interact with your entire Zoho ecosystem through a secure, OAuth-based authentication system.
 
 **Free & Open Source** - Built with ❤️ by the team at [JunnAI](https://junnaisystem.com)
+
+## 🎯 Supported Zoho Apps
+
+This MCP server supports **40+ Zoho applications** across all major business categories:
+
+### Currently Implemented (9 apps)
+- ✅ **CRM** - Customer relationship management
+- ✅ **Books** - Accounting and invoicing  
+- ✅ **Projects** - Project management
+- ✅ **Desk** - Customer support ticketing
+- ✅ **People** - HR management
+- ✅ **Recruit** - Applicant tracking
+- ✅ **Inventory** - Stock management
+- ✅ **Analytics** - Business intelligence
+- ✅ **Creator** - Custom applications
+
+### Available (30+ more apps)
+**Sales & Marketing**: SalesIQ, Campaigns, Social, Forms, Survey  
+**Finance**: Invoice, Expense, Subscriptions, Commerce  
+**Collaboration**: Connect, Cliq, Meeting, Assist  
+**Productivity**: Mail, WorkDrive, Writer, Sheet, Show  
+**Operations**: Fleet, FSM, Bookings  
+**Developer**: Flow, Catalyst  
+**Legal**: Sign, Contracts  
+**IoT**: IoT Platform
+
+*See [ZOHO_APPS_COMPLETE_LIST.md](.kiro/specs/multi-app-support/ZOHO_APPS_COMPLETE_LIST.md) for the complete list*
 
 ## ✨ Features
 
 - **🔐 Secure OAuth Authentication** - Full OAuth 2.0 flow with automatic token refresh
-- **📊 Complete CRM Operations** - Create, read, update, delete records across all modules
-- **🔍 Advanced Search** - Powerful search and filtering capabilities
-- **📈 Analytics Support** - Access to user information and organization data
+- **🌐 Multi-App Support** - Access 40+ Zoho applications through a single MCP server
+- **📊 Complete Operations** - Create, read, update, delete records across all apps
+- **🔍 Advanced Search** - Powerful search and filtering capabilities across apps
+- **📈 Business Intelligence** - Access Analytics, reports, and dashboards
 - **🔄 Bulk Operations** - Efficiently handle multiple records at once
-- **🎯 Lead Conversion** - Convert leads to accounts, contacts, and deals
-- **📱 Relationship Management** - Access related records across modules
+- **🎯 Smart Routing** - Automatic API routing based on enabled apps
+- **📱 Cross-App Integration** - Seamlessly work across multiple Zoho services
 - **⚡ Real-time Token Management** - Automatic token refresh and error handling
 - **📝 Comprehensive Logging** - Detailed logging for debugging and monitoring
+- **🧩 Modular Architecture** - Only loads tools for apps you have access to
 
 ## 🚀 Quick Start
 
@@ -104,12 +133,13 @@ This MCP server is designed to work with AI assistants that support the Model Co
 Tell your AI assistant:
 
 ```
-I have a Zoho CRM MCP server ready to use. Here are the details:
+I have a Zoho Ecosystem MCP server ready to use. Here are the details:
 
 Path to MCP Server: /path/to/your/zoho-crm-mcp/src/server.py
 
-Please use this MCP server to help me work with my Zoho CRM data. 
-Start by running authenticate_zoho() to connect to my Zoho CRM account.
+Please use this MCP server to help me work with my Zoho data across multiple apps. 
+Start by running list_enabled_apps() to see which Zoho apps are available,
+then authenticate_zoho() to connect to my Zoho account.
 ```
 
 #### For Claude Desktop Users:
@@ -119,7 +149,7 @@ Add this to your Claude Desktop MCP configuration:
 ```json
 {
   "mcpServers": {
-    "zoho-crm": {
+    "zoho-ecosystem": {
       "command": "python",
       "args": ["/path/to/your/zoho-crm-mcp/src/server.py"],
       "env": {
@@ -134,30 +164,71 @@ Add this to your Claude Desktop MCP configuration:
 #### First-Time Setup:
 
 On first use, the server will:
-1. Open your web browser for Zoho authentication
-2. Redirect you to Zoho's login page
-3. After successful login, redirect back to the server
-4. Store authentication tokens securely for future use
+1. Detect which Zoho apps you have access to based on your OAuth scopes
+2. Open your web browser for Zoho authentication
+3. Redirect you to Zoho's login page
+4. After successful login, redirect back to the server
+5. Store authentication tokens securely for future use
+6. Load only the tools for apps you have enabled
 
 ### 5. Quick Reference - Available Tools
 
 Once connected, your AI assistant can use these tools:
 
+**System Tools:**
 ```
-• authenticate_zoho() - Authenticate with Zoho CRM (opens browser)
-• get_modules() - Get all available CRM modules  
-• get_records(module_name, page, per_page) - Get records from modules
-• search_records(module_name, criteria) - Search for specific records
-• create_record(module_name, record_data) - Create new records
-• update_record(module_name, record_id, record_data) - Update existing records
-• get_record_by_id(module_name, record_id) - Get specific record by ID
-• convert_lead(lead_id, convert_data) - Convert leads to accounts/contacts/deals
+• list_enabled_apps() - See which Zoho apps are available
+• authenticate_zoho() - Authenticate with Zoho (opens browser)
+• revoke_authentication() - Revoke stored tokens
+```
+
+**CRM Tools (20+ tools):**
+```
+• get_modules() - Get all CRM modules  
+• get_records() - Get records from modules
+• search_records() - Search for specific records
+• create_record() - Create new records
+• update_record() - Update existing records
+• convert_lead() - Convert leads to accounts/contacts/deals
 • get_organization_info() - Get organization details
-• get_users() - Get CRM users information
-• bulk_create_records(module_name, records_data) - Create multiple records
-• get_related_records(module_name, record_id, related_module) - Get related records
-• get_record_count(module_name, criteria) - Get record counts
+• And more...
 ```
+
+**Books Tools (9 tools):**
+```
+• books_get_invoices() - Get invoices
+• books_create_invoice() - Create new invoice
+• books_get_customers() - Get customers
+• books_get_vendors() - Get vendors
+• books_get_bills() - Get bills
+• books_get_expenses() - Get expenses
+• And more...
+```
+
+**Projects Tools (9 tools):**
+```
+• projects_get_portals() - Get all portals
+• projects_get_projects() - Get projects
+• projects_get_tasks() - Get tasks
+• projects_create_task() - Create new task
+• projects_get_milestones() - Get milestones
+• projects_get_timesheets() - Get timesheets
+• And more...
+```
+
+**Desk Tools (8 tools):**
+```
+• desk_get_tickets() - Get support tickets
+• desk_create_ticket() - Create new ticket
+• desk_update_ticket() - Update ticket
+• desk_add_comment() - Add comment to ticket
+• desk_get_contacts() - Get support contacts
+• And more...
+```
+
+**People, Recruit, Inventory, Analytics, Creator Tools:**
+- 30+ additional tools for HR, recruitment, inventory, analytics, and custom apps
+- See tool documentation for complete list
 
 ## 📚 Available Tools
 

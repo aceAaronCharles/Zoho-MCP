@@ -1,0 +1,749 @@
+<%
+// Fixed syntax - removed the extra curly brace that was causing the red error
+BookingId = Bookings[ID == input.recordId.toLong()];
+info BookingId;
+data = thisapp.getPrepSheetData(input.recordId.toLong());
+info data;
+quotedItems = thisapp.getQuotedItems(input.recordId.toLong());
+%><!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Preparation Sheet</title>
+<style>
+body { 
+  font-family: Arial, sans-serif; 
+  margin: 20px; 
+  font-size: 14px; 
+  box-sizing: border-box; 
+}
+
+h1 { 
+  text-align: center; 
+  margin-bottom: 12px; 
+  font-size: 20px; 
+  text-transform: uppercase; 
+}
+
+.controls { 
+  display:flex; 
+  gap:8px; 
+  justify-content:flex-end; 
+  margin-bottom:8px; 
+  position:relative; 
+  z-index:9999; 
+}
+
+.btn { 
+  background:#1976d2; 
+  color:#fff; 
+  border:0; 
+  padding:8px 12px; 
+  cursor:pointer; 
+  border-radius:4px; 
+  font-size:13px; 
+  pointer-events: auto; 
+}
+
+.btn.secondary { 
+  background:#6b6b6b; 
+}
+
+table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-bottom: 20px; 
+  box-sizing: border-box; 
+}
+
+table, th, td { 
+  border: 1px solid black; 
+}
+
+th, td { 
+  padding: 6px; 
+  text-align: left; 
+  box-sizing: border-box; 
+}
+
+.job-details-table th { 
+  width: 15%; 
+  white-space: nowrap; 
+}
+
+.job-details-table td { 
+  width: 18%; 
+  min-width: 80px; 
+}
+
+.side-by-side-container { 
+  display: flex; 
+  gap: 20px; 
+  align-items: flex-start; 
+  justify-content: space-between; 
+}
+
+.left-section  { 
+  flex: 0 0 60%; 
+  min-width: 340px; 
+  box-sizing: border-box; 
+}
+
+.right-section { 
+  flex: 0 0 40%; 
+  min-width: 260px; 
+  box-sizing: border-box; 
+}
+
+.section-title { 
+  font-weight: bold; 
+  margin: 15px 0 5px; 
+  font-size: 16px; 
+  text-decoration: underline; 
+}
+
+.items-table { 
+  table-layout: fixed; 
+  width: 100%; 
+  word-break: break-word; 
+  box-sizing: border-box; 
+}
+
+.items-table col.material   { width: 34%; }
+.items-table col.requested  { width: 11%; }
+.items-table col.issued     { width: 11%; }
+.items-table col.confirmed  { width: 11%; }
+.items-table col.missing    { width: 16%; }
+.items-table col.worn       { width: 17%; }
+
+.items-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  line-height: 1.05;
+  font-size: 11px;
+  box-sizing: border-box;
+}
+
+.items-table td {
+  padding: 8px;
+  text-align: center;
+  min-height: 30px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.items-table .material-name { 
+  text-align: left; 
+  font-weight: 500; 
+  padding-left: 8px; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
+
+.labour-table { 
+  border-collapse: collapse; 
+  table-layout: fixed; 
+  width: 100%; 
+  box-sizing: border-box; 
+}
+
+.labour-table th { 
+  background-color: #f5f5f5; 
+  font-weight: bold; 
+  text-align: left; 
+  padding: 8px; 
+  font-size: 12px; 
+}
+
+.labour-table td {
+  padding: 8px; 
+  text-align: left; 
+  font-size: 12px; 
+  vertical-align: middle;
+  border-top: 1px solid #e6e6e6; 
+  overflow: hidden; 
+  white-space: nowrap; 
+  text-overflow: ellipsis;
+}
+
+.labour-table td.phone { 
+  padding: 6px; 
+  font-size: 11px; 
+}
+
+.labour-table td.signature { 
+  border-bottom: 1px solid #000; 
+  height: 32px; 
+  padding-top: 8px; 
+  background: #fff; 
+}
+
+.labour-table tbody tr { 
+  height: 24px; 
+}
+
+.labour-table td.amount { 
+  text-align: right; 
+  padding-right: 12px; 
+}
+
+.labour-table td.extra  { 
+  padding: 6px; 
+}
+
+.labour-table tbody tr:nth-child(odd) td { 
+  background: #fafafa; 
+}
+
+.subsection-title { 
+  font-weight: bold; 
+  text-align: center; 
+  margin-bottom: 10px; 
+  padding: 5px; 
+  background-color: #f0f0f0; 
+  border: 1px solid #ccc; 
+  font-size: 14px; 
+}
+
+.question-item { 
+  margin: 5px 0; 
+  padding: 3px 5px; 
+  font-size: 12px; 
+  border-bottom: 1px dotted #ccc; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
+
+.auto-fill-field { 
+  font-weight: bold; 
+  color: #333; 
+  white-space: nowrap; 
+  min-width: 40px; 
+  display: inline-block; 
+  border-bottom: 1px solid #666; 
+  padding: 2px 4px; 
+}
+
+.additional-details-table { 
+  table-layout: fixed; 
+  width: 100%; 
+  margin-bottom: 8px; 
+  border-collapse: collapse; 
+}
+
+.additional-details-table col.opt-col { width: 30%; }
+.additional-details-table col.tl-col  { width: 35%; }
+.additional-details-table col.ops-col { width: 35%; }
+
+.additional-details-table th, 
+.additional-details-table td { 
+  padding: 4px 6px; 
+  font-size: 12px; 
+  text-align: left; 
+  vertical-align: middle; 
+}
+
+.additional-details-table th { 
+  font-weight: bold; 
+}
+
+.row { 
+  display: flex; 
+  flex-wrap: wrap; 
+  margin-bottom: 10px; 
+}
+
+.col { 
+  flex: 1; 
+  min-width: 150px; 
+  padding: 5px; 
+  border: 1px solid #000; 
+}
+
+.label { 
+  font-weight: bold; 
+}
+
+.text-area-container {
+  margin: 10px 0;
+}
+
+.text-area-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.additional-notes-field {
+  min-height: 40px;
+  border: 1px solid #000;
+  padding: 5px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* CRITICAL PRINT STYLES */
+@media print {
+  .no-print { 
+    display: none !important; 
+  }
+  
+  body { 
+    margin: 0;
+    padding: 10mm;
+    font-size: 10pt; 
+    line-height: 1.2; 
+    -webkit-print-color-adjust: exact; 
+    print-color-adjust: exact;
+    color: #000;
+    background: #fff;
+  }
+  
+  /* Ensure all content is visible */
+  html, body {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  
+  h1 {
+    font-size: 16pt;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+  
+  table { 
+    margin-bottom: 8px; 
+    page-break-inside: auto;
+    border-color: #000;
+    width: 100%;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  thead {
+    display: table-header-group;
+  }
+  
+  th, td { 
+    padding: 4px 5px; 
+    font-size: 9pt; 
+    line-height: 1.1; 
+    border: 1px solid #000; 
+  }
+  
+  .items-table th { 
+    white-space: nowrap; 
+    padding: 3px 4px; 
+    font-size: 8pt; 
+    background-color: #f5f5f5 !important; 
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .items-table td { 
+    padding: 6px 6px; 
+    min-height: 20px; 
+    font-size: 9pt; 
+  }
+  
+  .section-title {
+    font-size: 12pt;
+    margin: 10px 0 5px;
+    page-break-after: avoid;
+  }
+  
+  .side-by-side-container {
+    page-break-inside: avoid;
+  }
+  
+  .row {
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure backgrounds print */
+  .subsection-title {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .labour-table tbody tr:nth-child(odd) td {
+    background: #fafafa !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 10mm;
+}
+</style>
+</head>
+<body>
+
+<!-- Controls (not printed) -->
+<div class="controls no-print">
+  <button id="printBtn" class="btn" type="button">Print</button>
+  <button id="backBtn" class="btn secondary" type="button">Back</button>
+</div>
+
+<h1>TAYLOR MOVERS RELOCATION PREPARATION SHEET</h1>
+
+<div class="section-title">Job Details</div>
+<table class="job-details-table">
+  <tr>
+    <th>Client Name</th>
+    <td><%=data.get("Deal_Details").get("Account_Name").get("name")%></td>
+    <th>CBM</th>
+    <td><%=data.get("No_of_CBM")%></td>
+    <th>Surveyor Name</th>
+    <td><%=data.get("Deal_Details").get("Owner").get("name")%></td>
+  </tr>
+  <tr>
+    <th>Phone</th>
+    <td><%=BookingId.Contact_Phone%></td>
+    <th>Move Type</th>
+    <td><%=data.get("Deal_Details").get("Service_Type").get("name")%></td>
+    <th>Survey Type</th>
+    <td><%=data.get("Deal_Details").get("Survey_Type")%></td>
+  </tr>
+  <tr>
+    <th>Move Changed Date</th>
+    <td><%=BookingId.Actual_Move_Date%></td>
+    <th>Origin</th>
+    <td><%=data.get("Deal_Details").get("Origin_Town") + ", " + data.get("Deal_Details").get("Origin_Estate")%></td>
+    <th>Origin Floor</th>
+    <td><%=data.get("Deal_Details").get("Origin_Floors")%></td>
+  </tr>
+  <tr>
+    <th>Team Leader</th>
+    <td></td>
+    <th>Destination</th>
+    <td><%=data.get("Deal_Details").get("Destination_Town") + ", " + data.get("Deal_Details").get("Destination_Estate")%></td>
+    <th>Destination Floor</th>
+    <td><%=data.get("Deal_Details").get("Destination_Floors")%></td>
+  </tr>
+  <tr>
+    <th>Amount</th>
+    <td><%=data.get("Deal_Details").get("Amount")%></td>
+    <th>Manual Job Card Number</th>
+    <td><%=BookingId.Job_Card_Number%></td>
+    <th>Sensitivity</th>
+    <td><%=data.get("Deal_Details").get("Sensitivity")%></td>
+  </tr>
+  <tr>
+    <th>Operation Notes</th>
+    <td colspan="5"></td>
+  </tr>
+</table>
+
+<div class="section-title">Sensitivity Information</div>
+<div class="row">
+  <div class="col">
+    <div class="subsection-title">VIP DETAILS</div>
+    <%if(data.get("Deal_Details").get("VIP_Account") == "Yes"){%>
+    <div class="question-item">VIP Account: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Prominent_Person") == "Yes"){%>
+    <div class="question-item">Prominent Person: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Influential_to_more_Jobs") == "Yes"){%>
+    <div class="question-item">Influential to more jobs: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("More_Jobs") == "Yes"){%>
+    <div class="question-item">More jobs: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+  
+  <div class="col">
+    <div class="subsection-title">CLIENT SENSITIVITIES</div>
+    <%if(data.get("Deal_Details").get("Seperating_Divorcing") == "Yes"){%>
+    <div class="question-item">Separating/Divorcing Couple: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Time_Pressure_e_g_flight") == "Yes"){%>
+    <div class="question-item">Time Pressure (flight etc.): <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Sick_Person") == "Yes"){%>
+    <div class="question-item">Sick Person: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Elderly_Person") == "Yes"){%>
+    <div class="question-item">Elderly person: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+  
+  <div class="col">
+    <div class="subsection-title">SPECIAL REQUESTS</div>
+    <%if(data.get("Deal_Details").get("Timing") == "Yes"){%>
+    <div class="question-item">Timing: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Only_one_Trip") == "Yes"){%>
+    <div class="question-item">Only one trip: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Branded_Truck") == "Yes"){%>
+    <div class="question-item">Branded truck: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+  
+  <div class="col">
+    <div class="subsection-title">MOVERS APPEARANCES</div>
+    <%if(data.get("Deal_Details").get("Movers_Wearing_Gloves") == "Yes"){%>
+    <div class="question-item">Movers wearing gloves: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Extra_Clean_Movers") == "Yes"){%>
+    <div class="question-item">Extra clean movers: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+  
+  <div class="col">
+    <div class="subsection-title">SPECIAL CONDITIONS</div>
+    <%if(data.get("Deal_Details").get("Temperamental") == "Yes"){%>
+    <div class="question-item">Temperamental: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Easily_Angered") == "Yes"){%>
+    <div class="question-item">Easily angered: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+  
+  <div class="col">
+    <div class="subsection-title">LOCATION AND INSTALLATIONS</div>
+    <%if(data.get("Deal_Details").get("Sensitivity_of_items_like_glass_electronic") == "Yes"){%>
+    <div class="question-item">Sensitive items (glass/electronics): <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Special_Handaling") == "Yes"){%>
+    <div class="question-item">Special handling & installation: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Items_Removed_Through_Windows") == "Yes"){%>
+    <div class="question-item">Items removed through windows: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Narrow_Corridor") == "Yes"){%>
+    <div class="question-item">Narrow corridors: <span class="auto-fill-field">Yes</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Lift_Available") == "No"){%>
+    <div class="question-item">Lift available: <span class="auto-fill-field">No</span></div>
+    <%}
+    if(data.get("Deal_Details").get("Long_Walk") == "Yes"){%>
+    <div class="question-item">Long walk: <span class="auto-fill-field">Yes</span></div>
+    <%}%>
+  </div>
+</div>
+
+<%
+showOriginParking = data.get("Deal_Details").get("Parking_Available_at_Origin") == "No";
+showDestParking = data.get("Deal_Details").get("Parking_Available_at_Destination") == "No";
+if(showOriginParking || showDestParking){
+%>
+<div class="row text-center">
+  <%if(showOriginParking){%>
+  <div class="col">Parking NOT Available at Origin</div>
+  <%}
+  if(showDestParking){%>
+  <div class="col">Parking NOT Available at Destination</div>
+  <%}%>
+  <div class="col">Latest Time Vehicles Allowed:</div>
+  <div class="col"><%=data.get("Deal_Details").get("Latest_time_vehicle_Allowed")%></div>
+</div>
+<%}%>
+
+<div class="text-area-container">
+  <div class="text-area-label">Additional Sensitivity Notes:</div>
+  <div class="additional-notes-field"></div>
+</div>
+
+<div class="side-by-side-container">
+  <div class="left-section">
+    <div class="section-title">Items</div>
+    <table id="items-table" class="items-table">
+      <colgroup>
+        <col class="material" />
+        <col class="requested" />
+        <col class="issued" />
+        <col class="confirmed" />
+        <col class="missing" />
+        <col class="worn" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Materials</th>
+          <th>Requested</th>
+          <th>Issued</th>
+          <th>Confirmed</th>
+          <th>Missing</th>
+          <th>Worn Out</th>
+        </tr>
+      </thead>
+      <tbody id="items-tbody">
+        <%for each rec in quotedItems{
+          productName = rec.get("ProductName");
+          Quantity = rec.get("Quantity");
+        %>
+        <tr>
+          <td class="material-name"><%=productName%></td>
+          <td><%=Quantity%></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <%}%>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="right-section">
+    <div class="section-title">Labour</div>
+    <table class="labour-table">
+      <colgroup>
+        <col class="name-col" style="width:35%" />
+        <col class="phone-col" style="width:20%" />
+        <col class="signature-col" style="width:15%" />
+        <col class="amount-col" style="width:18%" />
+        <col class="extra-col" style="width:12%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Signature</th>
+          <th style="text-align:right;">Amount</th>
+          <th aria-hidden="true"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+        <tr><td></td><td class="phone"></td><td class="signature"></td><td class="amount"></td><td class="extra"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section-title">Additional Details</div>
+<p>Important Notes:</p>
+<table class="additional-details-table">
+  <colgroup>
+    <col class="opt-col" />
+    <col class="tl-col" />
+    <col class="ops-col" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Opt. Confirmation</th>
+      <th>TL</th>
+      <th>Ops</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Team Leader</td>
+      <td>Ops</td>
+      <td>Ops</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+// SIMPLIFIED AND IMPROVED PRINT FUNCTION
+function printPrepSheet() {
+  console.log('Print initiated');
+  
+  // Use direct window.print() - most reliable for full page printing
+  try {
+    window.print();
+    console.log('window.print() called');
+  } catch(e) {
+    console.error('Print failed:', e);
+    alert('Unable to print. Please use Ctrl+P (or Cmd+P on Mac) to print.');
+  }
+}
+
+// BACK NAVIGATION FUNCTION
+function goBack() {
+  console.log('Back navigation initiated');
+  
+  // Try Zoho Creator navigation first
+  try {
+    if (typeof ZC !== 'undefined' && ZC.navigateParent) {
+      ZC.navigateParent('view', 'Bookings', 'All_Bookings');
+      return;
+    }
+  } catch(e) {
+    console.error('ZC navigation failed:', e);
+  }
+  
+  // Try close popup
+  try {
+    if (typeof ZC !== 'undefined' && ZC.closePopup) {
+      ZC.closePopup();
+      return;
+    }
+  } catch(e) {}
+  
+  // Standard history back
+  try {
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+  } catch(e) {}
+  
+  // Last resort
+  alert('Please use your browser\'s back button.');
+}
+
+// ATTACH EVENT LISTENERS
+document.addEventListener('DOMContentLoaded', function() {
+  var printBtn = document.getElementById('printBtn');
+  var backBtn = document.getElementById('backBtn');
+  
+  if (printBtn) {
+    printBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      printPrepSheet();
+    });
+  }
+  
+  if (backBtn) {
+    backBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      goBack();
+    });
+  }
+});
+
+// KEYBOARD SHORTCUTS
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+    e.preventDefault();
+    printPrepSheet();
+  }
+  if (e.key === 'Escape') {
+    goBack();
+  }
+});
+</script>
+
+</body>
+</html>

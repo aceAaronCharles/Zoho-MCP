@@ -15,6 +15,16 @@ import asyncio
 from functools import wraps
 
 from zoho_auth import ZohoAuth
+from app_registry import AppRegistry
+from api_router import APIRouter
+from apps.books_tools import register_books_tools
+from apps.projects_tools import register_projects_tools
+from apps.desk_tools import register_desk_tools
+from apps.people_tools import register_people_tools
+from apps.recruit_tools import register_recruit_tools
+from apps.inventory_tools import register_inventory_tools
+from apps.analytics_tools import register_analytics_tools
+from apps.creator_tools import register_creator_tools
 
 # Load environment variables
 load_dotenv()
@@ -41,12 +51,14 @@ mcp = FastMCP(
     name=os.getenv('MCP_SERVER_NAME', 'ZohoCRM')
 )
 
-# Global auth instance
+# Global instances
 auth: Optional[ZohoAuth] = None
+app_registry: Optional[AppRegistry] = None
+api_router: Optional[APIRouter] = None
 
-def init_auth():
-    """Initialize Zoho authentication."""
-    global auth
+def init_system():
+    """Initialize authentication, registry, and router."""
+    global auth, app_registry, api_router
     
     client_id = os.getenv('ZOHO_CLIENT_ID')
     client_secret = os.getenv('ZOHO_CLIENT_SECRET')
@@ -54,6 +66,7 @@ def init_auth():
     if not client_id or not client_secret:
         raise ValueError("ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET must be set in environment variables")
     
+    # Initialize authentication
     auth = ZohoAuth(
         client_id=client_id,
         client_secret=client_secret,
@@ -63,13 +76,39 @@ def init_auth():
         api_domain=os.getenv('ZOHO_API_DOMAIN', 'https://www.zohoapis.com'),
         accounts_domain=os.getenv('ZOHO_ACCOUNTS_DOMAIN', 'https://accounts.zoho.com')
     )
+    
+    # Initialize app registry
+    scope = os.getenv('ZOHO_SCOPE', '')
+    app_registry = AppRegistry(scope)
+    
+    # Initialize API router
+    api_router = APIRouter(auth, app_registry)
+    
+    # Log enabled apps
+    enabled_apps = app_registry.list_enabled_apps()
+    enabled_names = [app.name for app in enabled_apps]
+    logger.info(f"Enabled Zoho apps ({len(enabled_names)}): {', '.join(enabled_names)}")
+    
+    # Log enabled categories
+    categories = app_registry.get_enabled_categories()
+    logger.info(f"Enabled categories: {', '.join(categories)}")
+    
+    # Register app-specific tools
+    register_books_tools(mcp, api_router, app_registry)
+    register_projects_tools(mcp, api_router, app_registry)
+    register_desk_tools(mcp, api_router, app_registry)
+    register_people_tools(mcp, api_router, app_registry)
+    register_recruit_tools(mcp, api_router, app_registry)
+    register_inventory_tools(mcp, api_router, app_registry)
+    register_analytics_tools(mcp, api_router, app_registry)
+    register_creator_tools(mcp, api_router, app_registry)
 
 def require_auth(func):
     """Decorator to ensure authentication before API calls."""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not auth:
-            init_auth()
+        if not auth or not app_registry or not api_router:
+            init_system()
         
         try:
             return func(*args, **kwargs)
@@ -80,61 +119,69 @@ def require_auth(func):
     return wrapper
 
 def make_api_request(endpoint: str, method: str = 'GET', data: Optional[Dict] = None, params: Optional[Dict] = None) -> Dict[str, Any]:
-    """Make authenticated API request to Zoho CRM."""
-    if not auth:
-        raise Exception("Authentication not initialized")
+    """
+    Make authenticated API request to Zoho CRM (backward compatibility wrapper).
     
-    headers = auth.get_headers()
-    api_domain = auth.get_api_domain()
-    api_version = os.getenv('ZOHO_API_VERSION', 'v2')
+    This function maintains backward compatibility with existing CRM tools.
+    New tools should use api_router.make_request() directly.
+    """
+    if not api_router:
+        raise Exception("API router not initialized")
     
-    url = f"{api_domain}/crm/{api_version}/{endpoint}"
+    return api_router.make_request(
+        app_name="CRM",
+        endpoint=endpoint,
+        method=method,
+        data=data,
+        params=params
+    )
+
+# System Management Tools
+
+@mcp.tool()
+@require_auth
+def list_enabled_apps(ctx) -> Dict[str, Any]:
+    """
+    List all currently enabled Zoho applications.
     
-    timeout = int(os.getenv('REQUEST_TIMEOUT', '30'))
-    
+    Returns:
+        Dict containing list of enabled apps with their details
+    """
     try:
-        if method == 'GET':
-            response = requests.get(url, headers=headers, params=params, timeout=timeout)
-        elif method == 'POST':
-            response = requests.post(url, headers=headers, json=data, params=params, timeout=timeout)
-        elif method == 'PUT':
-            response = requests.put(url, headers=headers, json=data, params=params, timeout=timeout)
-        elif method == 'DELETE':
-            response = requests.delete(url, headers=headers, params=params, timeout=timeout)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
+        enabled_apps = app_registry.list_enabled_apps()
         
-        if response.status_code in [200, 201, 202]:
-            return {
-                'status': 'success',
-                'status_code': response.status_code,
-                'data': response.json()
-            }
-        else:
-            return {
-                'status': 'error',
-                'status_code': response.status_code,
-                'message': response.text,
-                'error': response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
-            }
-    
-    except requests.exceptions.Timeout:
+        apps_by_category = {}
+        for app in enabled_apps:
+            category = app.category
+            if category not in apps_by_category:
+                apps_by_category[category] = []
+            
+            apps_by_category[category].append({
+                'name': app.name,
+                'api_version': app.api_version,
+                'api_path': app.api_path
+            })
+        
         return {
-            'status': 'error',
-            'message': 'Request timed out',
-            'error': 'timeout'
-        }
-    except requests.exceptions.RequestException as e:
-        return {
-            'status': 'error',
-            'message': f'Request failed: {str(e)}',
-            'error': str(e)
+            'status': 'success',
+            'total_enabled': len(enabled_apps),
+            'categories': list(apps_by_category.keys()),
+            'apps_by_category': apps_by_category,
+            'all_apps': [
+                {
+                    'name': app.name,
+                    'category': app.category,
+                    'api_version': app.api_version,
+                    'enabled': True
+                }
+                for app in enabled_apps
+            ]
         }
     except Exception as e:
+        logger.error(f"Error listing enabled apps: {e}")
         return {
             'status': 'error',
-            'message': f'Unexpected error: {str(e)}',
-            'error': str(e)
+            'message': f'Failed to list enabled apps: {str(e)}'
         }
 
 # Authentication Tools
@@ -721,13 +768,13 @@ def get_record_count(ctx, module_name: str, criteria: str = None) -> Dict[str, A
     
     return result
 
-# Initialize authentication on import
+# Initialize system on import
 try:
-    init_auth()
-    logger.info("Zoho CRM MCP Server initialized successfully")
+    init_system()
+    logger.info("Zoho Multi-App MCP Server initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize auth: {e}")
-    logger.info("Authentication will be initialized on first tool call")
+    logger.error(f"Failed to initialize system: {e}")
+    logger.info("System will be initialized on first tool call")
 
 if __name__ == "__main__":
     mcp.run()
