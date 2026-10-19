@@ -23,6 +23,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * The single-host `docker-compose.yml` now binds port 8000 to loopback by
   default; use the production stack for public hosting.
+* Container image moved to `python:3.14-slim`; the test matrix now covers
+  3.11–3.14.
+* GitHub Actions refreshed (checkout, setup-python, buildx, login, metadata)
+  and Trivy bumped to `0.36.0`, whose older tag had been removed upstream and
+  was failing every scan job.
+
+### Removed
+
+* Deprecated TypeScript prototype, ad-hoc root scripts, Zoho Creator/Deluge
+  exports, generated report JSON, and stale setup guides that referenced them.
+  The Python server, `README.md`, and `DEPLOY.md` are the single source of truth.
 
 ## [1.0.0] - 2026-10-19
 

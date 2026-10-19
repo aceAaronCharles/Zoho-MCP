@@ -26,7 +26,7 @@ make fmt      # black + isort
 make check    # lint + test
 ```
 
-* Python 3.11+ is required; CI runs 3.11, 3.12 and 3.13.
+* Python 3.11+ is required; CI runs 3.11, 3.12, 3.13 and 3.14.
 * Keep lines at 120 columns (Black/isort config is in `pyproject.toml`).
 * Add or update tests for behaviour changes. Tests live in `tests/`.
 
