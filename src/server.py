@@ -1392,6 +1392,12 @@ def _build_http_app():
         from portal.app import BearerError
 
     token = (os.getenv("MCP_HTTP_TOKEN") or "").strip()
+    require_auth = (os.getenv("MCP_REQUIRE_AUTH", "") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     mcp_prefix = path.rstrip("/")
 
     def _is_mcp_path(request_path: str) -> bool:
@@ -1482,11 +1488,29 @@ def _build_http_app():
 
     if portal is not None or token:
         app.add_middleware(MCPAuthMiddleware)
+    elif require_auth:
+        # Fail closed: the operator asked for authentication but nothing can
+        # satisfy it, so every /mcp request would 401.
+        raise SystemExit(
+            "MCP_REQUIRE_AUTH=true but neither MCP_HTTP_TOKEN nor the connection "
+            "portal is configured, so every /mcp request would be rejected. Set "
+            "MCP_HTTP_TOKEN or PORTAL_ENABLED=true."
+        )
     elif host not in {"127.0.0.1", "localhost", "::1"}:
         raise SystemExit(
             "Refusing to bind the HTTP transport to a non-loopback address without "
             "MCP_HTTP_TOKEN or the connection portal. Set MCP_HTTP_TOKEN, enable "
             "PORTAL_ENABLED=true, or bind to 127.0.0.1 behind a proxy."
+        )
+    else:
+        # Loopback is allowed without credentials for local development, but a
+        # loopback bind is also how people run the server behind a reverse
+        # proxy. In that case /mcp would be reachable by anyone, so warn.
+        logger.warning(
+            "HTTP transport bound to %s with no authentication configured. If this "
+            "port is reachable through a reverse proxy, /mcp is open to anyone. Set "
+            "MCP_HTTP_TOKEN, enable PORTAL_ENABLED=true, or set MCP_REQUIRE_AUTH=true.",
+            host,
         )
 
     return app, host, port, path, portal
