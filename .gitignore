@@ -5,9 +5,6 @@
 .zoho_tokens.json
 *.tokens.json
 
-# Node dependencies (the TypeScript prototype is deprecated)
-node_modules/
-
 # Python
 __pycache__/
 *.py[cod]
