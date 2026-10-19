@@ -1,48 +1,59 @@
-# Deploying the Zoho MCP server on a VPS
+# Deploying the Zoho MCP server
 
-A production runbook for hosting the server on a single VPS with Docker Compose
-and automatic HTTPS (Caddy). It targets the **multi-tenant** setup, where every
-user connects their own Zoho account through the connection portal, and notes
-the single-tenant alternative at the end.
+A production runbook for hosting the server on a VPS. It targets the
+**multi-tenant** setup (each user connects their own Zoho account through the
+connection portal); the single-tenant alternative is documented at the end.
+
+## Choose a path
+
+| Path | Best for | You get |
+| --- | --- | --- |
+| **A. Docker Compose** (recommended) | Most deployments | Caddy with automatic HTTPS, container isolation, one command to update |
+| **B. systemd** | Hosts that don't run Docker | Hardened service unit, nightly backup timer, host reverse proxy |
+| **C. Cloud bootstrap** | A brand-new VPS | Terraform + cloud-init that provisions and configures everything |
+
+All three run the same server and use the same `.env` variables.
 
 ## What gets deployed
 
 ```
-Internet ──443──▶ caddy ──http──▶ zoho-mcp:8000
-                  (TLS,           /mcp      MCP streamable HTTP
-                   Let's Encrypt)  /portal   setup UI + API keys
-                                   /health   liveness probe
+Internet ──443──▶ reverse proxy ──http──▶ zoho-mcp:8000
+                  (Caddy/nginx,            /mcp      MCP streamable HTTP
+                   TLS)                    /portal   setup UI + API keys
+                                           /health   liveness probe
 ```
-
-* `zoho-mcp` — the Python server. **Not published on the host**; only Caddy
-  reaches it, over the compose network.
-* `caddy` — terminates TLS, obtains and renews certificates automatically.
-* `zoho_data` volume — the token file and the encrypted `portal.db`.
-* `caddy_data` volume — the issued certificates.
-
-Artifacts in this repository:
 
 | File | Purpose |
 | --- | --- |
-| `docker-compose.prod.yml` | App + Caddy stack (this is the file to use on a VPS). |
+| `DEPLOY.md` | This runbook. |
+| `docker-compose.prod.yml` | App + Caddy stack (path A). The app is not published on the host. |
 | `deploy/Caddyfile` | Reverse proxy with MCP-friendly streaming. |
 | `deploy/env.prod.example` | Template for the root `.env`. |
-| `docker-compose.yml` | Simpler single-host variant (loopback bind, no proxy). |
+| `deploy/systemd/` | Hardened unit, nightly backup timer, env template (path B). |
+| `deploy/install-systemd.sh` | Idempotent installer for path B. |
+| `deploy/backup.sh` | Consistent SQLite + token backup, run by the timer. |
+| `deploy/cloud-init.yaml` | Provider-agnostic VPS bootstrap (path C). |
+| `deploy/terraform/hetzner/` | Terraform example that drives the cloud-init. |
+| `docker-compose.yml` | Single-host variant, loopback bind, no proxy. |
+| `Makefile` | `make help` for common tasks. |
 
 ## Prerequisites
 
-* A VPS with a public IP. **1 vCPU / 1 GB RAM is plenty** — the workload is
-  I/O-bound. Use x86-64 or arm64 Linux (the image is `python:3.12-slim`).
-* A (sub)domain, e.g. `mcp.example.com`, with an `A` (or `AAAA`) record pointing
-  at the VPS.
-* Ports **80 and 443** reachable from the internet (Caddy needs 80 for the
-  ACME HTTP challenge).
+* A VPS with a public IP. **1 vCPU / 1 GB is plenty** — the workload is I/O
+  bound.
+* A (sub)domain, e.g. `mcp.example.com`, with an `A`/`AAAA` record pointing at
+  the VPS.
+* Ports **80 and 443** reachable (Caddy uses 80 for the ACME challenge).
 * An OIDC identity provider where you can register a client (Google, Microsoft
   Entra, Okta, Auth0, Keycloak, Authentik). GitHub is plain OAuth2, not OIDC,
   so it does not work with the generic client.
-* Docker Engine with Compose v2.
+* Docker Engine with Compose v2 (path A and C) **or** Python 3.11+ (path B).
 
-## 1. DNS
+---
+
+## Path A — Docker Compose + Caddy
+
+### 1. DNS
 
 Create the record **before** starting Caddy so the certificate challenge can
 succeed:
@@ -51,9 +62,9 @@ succeed:
 mcp.example.com.  300  IN  A  203.0.113.10
 ```
 
-Verify it resolves to the VPS: `dig +short mcp.example.com`.
+Verify with `dig +short mcp.example.com`.
 
-## 2. Install Docker
+### 2. Install Docker
 
 ```bash
 curl -fsSL https://get.docker.com | sh
@@ -62,7 +73,7 @@ newgrp docker          # or log out and back in
 docker compose version
 ```
 
-## 3. Firewall
+### 3. Firewall
 
 ```bash
 sudo ufw allow OpenSSH
@@ -74,7 +85,7 @@ sudo ufw enable
 
 Do **not** open port 8000 — the application is only reachable through Caddy.
 
-## 4. Fetch the code and configure
+### 4. Fetch the code and configure
 
 ```bash
 sudo mkdir -p /opt && sudo chown "$USER" /opt
@@ -87,17 +98,146 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"   # MCP_SECRET_KEY
 chmod 600 .env
 ```
 
-Edit `.env` and set, at minimum:
+Edit `.env` and set:
 
 * `SITE_ADDRESS`, `ACME_EMAIL`, `PORTAL_BASE_URL` — your public host.
-* `MCP_SECRET_KEY` — the random value printed above. **Store a copy somewhere
-  safe**: losing it makes `portal.db` undecryptable.
+* `MCP_SECRET_KEY` — the value printed above. **Store a copy somewhere safe**:
+  losing it makes `portal.db` undecryptable.
 * `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS` — the same public host.
-* The `PORTAL_OIDC_*` values for your identity provider.
+* The `PORTAL_OIDC_*` values (see [Registering the redirect URIs](#registering-the-redirect-uris)).
 
-## 5. Register the redirect URIs
+### 5. Start the stack
 
-You have **two** callbacks to register, on two different systems:
+```bash
+docker compose -f docker-compose.prod.yml up -d --build   # or: make prod-up
+docker compose -f docker-compose.prod.yml logs -f zoho-mcp
+```
+
+Confirm:
+
+```bash
+curl -fsS https://mcp.example.com/health                            # {"status":"ok"}
+curl -s -o /dev/null -w '%{http_code}\n' https://mcp.example.com/mcp  # 401
+```
+
+The `401` is expected — `/mcp` requires a bearer credential.
+
+### 6. Use it
+
+Open `https://mcp.example.com/portal`, sign in with OIDC, paste your Zoho
+client ID/secret, authorize Zoho, and copy the API key (shown once). Point MCP
+clients at `https://mcp.example.com/mcp` with
+`Authorization: Bearer <api key>`.
+
+---
+
+## Path B — systemd (no Docker)
+
+Run the server directly, behind a host reverse proxy.
+
+### 1. Get the code
+
+```bash
+sudo mkdir -p /opt && sudo chown "$USER" /opt
+cd /opt
+git clone https://github.com/aceAaronCharles/Zoho-MCP.git zoho-mcp
+```
+
+Keep it under `/opt` (or `/srv`). The unit sets `ProtectHome=true`, so `/home`
+is hidden from the service.
+
+### 2. Install the service
+
+```bash
+cd /opt/zoho-mcp
+sudo ./deploy/install-systemd.sh
+```
+
+The installer:
+
+* creates the `zoho-mcp` system account,
+* builds the virtualenv and installs `requirements.txt`,
+* creates `/var/lib/zoho-mcp`, `/var/log/zoho-mcp`, `/var/backups/zoho-mcp`,
+* installs `/etc/zoho-mcp/zoho-mcp.env` from the template (mode `0640`),
+* installs and enables the unit plus the **nightly backup timer**,
+* starts the service only once a credential source is configured.
+
+### 3. Configure and start
+
+```bash
+sudoedit /etc/zoho-mcp/zoho-mcp.env     # SITE_ADDRESS, MCP_SECRET_KEY, OIDC, ...
+sudo systemctl restart zoho-mcp.service
+sudo systemctl status zoho-mcp.service
+journalctl -u zoho-mcp.service -f
+```
+
+The unit binds `MCP_HOST=127.0.0.1` and sets `MCP_REQUIRE_AUTH=true`, so the
+service **refuses to start** until the portal or a shared token is configured.
+That is deliberate: a loopback bind is not by itself authentication.
+
+### 4. TLS with a host reverse proxy
+
+```bash
+sudo apt install -y caddy
+```
+
+```
+# /etc/caddy/Caddyfile
+zoho.example.com {
+    reverse_proxy 127.0.0.1:8000 {
+        flush_interval -1
+    }
+}
+```
+
+```bash
+sudo systemctl reload caddy
+curl -fsS https://zoho.example.com/health
+```
+
+### 5. Backups
+
+`zoho-mcp-backup.timer` runs `deploy/backup.sh` nightly at 03:30 and prunes
+archives older than `BACKUP_RETENTION_DAYS` (default 14). Check it with:
+
+```bash
+systemctl list-timers zoho-mcp-backup.timer
+sudo systemctl start zoho-mcp-backup.service    # run one now
+ls -l /var/backups/zoho-mcp
+```
+
+---
+
+## Path C — automated cloud bootstrap
+
+`deploy/cloud-init.yaml` installs Docker, configures the firewall, clones the
+repository to `/opt/zoho-mcp`, generates `MCP_SECRET_KEY`, and writes
+`/root/NEXT-STEPS.txt`. It deliberately places **no** Zoho or OIDC secret in
+user-data (which is readable from the instance metadata service and the
+provider console).
+
+Use it by pasting into any provider's user-data field, or with the bundled
+Terraform example:
+
+```bash
+export HCLOUD_TOKEN="..."
+cd deploy/terraform/hetzner
+cp terraform.tfvars.example terraform.tfvars
+$EDITOR terraform.tfvars        # ssh_key_name, site_address, acme_email
+terraform init && terraform apply
+```
+
+Then create the DNS record it prints, wait for cloud-init, and follow
+`/root/NEXT-STEPS.txt`. See
+[`deploy/terraform/hetzner/README.md`](deploy/terraform/hetzner/README.md).
+For other providers, replace the `@@PLACEHOLDERS@@` in the cloud-init file by
+hand and open ports 22/80/443.
+
+---
+
+## Registering the redirect URIs
+
+Two callbacks are involved.
 
 | Register with | URI |
 | --- | --- |
@@ -105,44 +245,46 @@ You have **two** callbacks to register, on two different systems:
 | Each user's Zoho API console | `https://<host>/oauth/zoho/callback` |
 
 Zoho only permits `http://localhost` redirects for local testing; a hosted
-deployment must use `https://`, and the value in the Zoho console must match
-exactly.
+deployment must use `https://`, and the value must match exactly.
 
-## 6. Start the stack
+### Identity provider (portal sign-in)
 
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f zoho-mcp
-```
+The portal discovers endpoints from
+`<issuer>/.well-known/openid-configuration`. Create a **web** application and
+set the redirect/callback URI to `https://<host>/portal/auth/callback`.
 
-Caddy will request a certificate on first request. Confirm the deployment:
+| Provider | Issuer (`PORTAL_OIDC_ISSUER`) | Where to create the client |
+| --- | --- | --- |
+| Google | `https://accounts.google.com` | Cloud Console → APIs & Services → Credentials → Create OAuth client ID → Web application |
+| Microsoft Entra | `https://login.microsoftonline.com/<tenant-id>/v2.0` | Entra admin → App registrations → New registration → Redirect URI (Web) |
+| Okta | `https://<org>.okta.com` or `https://<org>.okta.com/oauth2/default` | Applications → Create App Integration → OIDC → Web Application |
+| Auth0 | `https://<tenant>.<region>.auth0.com/` | Applications → Create Application → Regular Web App → Allowed Callback URLs |
+| Keycloak | `https://<keycloak>/realms/<realm>` | Clients → Create client → OpenID Connect → Valid redirect URIs |
+| Authentik | `https://<authentik>/application/o/<slug>/` | Applications → Providers → OAuth2/OpenID Provider → Redirect URIs |
 
-```bash
-curl -fsS https://mcp.example.com/health          # {"status":"ok"}
-curl -s -o /dev/null -w '%{http_code}\n' https://mcp.example.com/mcp   # 401
-```
+Copy the client ID and secret into `PORTAL_OIDC_CLIENT_ID` and
+`PORTAL_OIDC_CLIENT_SECRET`. The default `PORTAL_OIDC_SCOPES` is
+`openid email profile`.
 
-The `401` is expected: `/mcp` requires a bearer credential.
+### Zoho (per user)
 
-## 7. Use it
+Each user, in the Zoho [API console](https://api-console.zoho.com/):
 
-* **Portal** — open `https://mcp.example.com/portal`, sign in with OIDC, paste
-  your Zoho client ID/secret, authorize Zoho, and copy the API key (shown once).
-* **MCP endpoint** — `https://mcp.example.com/mcp` with
-  `Authorization: Bearer <api key>`.
+1. Creates a **Server-based Application**.
+2. Sets the authorized redirect URI to `https://<host>/oauth/zoho/callback`.
+3. Copies the client ID and secret into the portal, chooses their data centre,
+   and approves the scope set (`all` by default).
 
-Each key resolves to its owner's Zoho connection, and the tool list adapts to
-the scopes that account actually granted.
+---
 
-## Connecting Hermes Agent
+## Connecting MCP clients
 
-Hermes Agent speaks standard MCP, so it can use the server either locally over
-stdio or remotely over HTTP. Both have been verified against this server
+### Hermes Agent
+
+Hermes speaks standard MCP; both transports are verified against this server
 (74 tools discovered).
 
-### Remote (the hosted deployment above)
-
-Add to `~/.hermes/config.yaml`, or use
+**Hosted (HTTP).** Add to `~/.hermes/config.yaml`, or run
 `hermes mcp add zoho --url https://mcp.example.com/mcp --auth header`:
 
 ```yaml
@@ -153,16 +295,14 @@ mcp_servers:
       Authorization: "Bearer ${ZOHO_MCP_API_KEY}"
 ```
 
-Put the key in `~/.hermes/.env` (Hermes resolves `${VAR}` from there):
+Put the key in `~/.hermes/.env`:
 
 ```
 ZOHO_MCP_API_KEY=zoho_xxxxxxxxxxxxxxxx
 ```
 
-### Local (stdio, single machine, no VPS)
-
-Hermes spawns the server as a subprocess. Use **absolute paths** so nothing
-depends on Hermes' working directory:
+**Local (stdio).** Hermes spawns the server as a subprocess; use absolute paths
+so nothing depends on Hermes' working directory:
 
 ```yaml
 mcp_servers:
@@ -175,20 +315,11 @@ mcp_servers:
       LOG_FILE_PATH: "/opt/zoho-mcp/logs/zoho_crm_mcp.log"
 ```
 
-The server reads its own `.env` and `.zoho_tokens.json`, so credentials do not
-need to be duplicated into the Hermes config.
+Verify with `hermes mcp list` and `hermes mcp test zoho`.
 
-### Verify
+### Other clients
 
-```bash
-hermes mcp list            # zoho  ...  ✓ enabled
-hermes mcp test zoho       # ✓ Connected ... ✓ Tools discovered: 74
-```
-
-## Connecting any other MCP client
-
-Cursor, VS Code, Windsurf, and Claude-compatible clients all accept the same
-shape:
+Cursor, VS Code, Windsurf and Claude-compatible clients accept the same shape:
 
 ```json
 {
@@ -201,80 +332,118 @@ shape:
 }
 ```
 
+---
+
 ## Single-tenant deployment
 
 One shared Zoho account, no portal, no identity provider:
 
-1. Set `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, and
-   `ZOHO_SCOPE` in `.env` (drop the `PORTAL_*` block).
-2. Generate a shared key and set `MCP_HTTP_TOKEN` (e.g.
-   `openssl rand -hex 32`).
+1. Set `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` and
+   `ZOHO_SCOPE` in `.env`; remove/disable the `PORTAL_*` block.
+2. Generate a shared key and set `MCP_HTTP_TOKEN` (`openssl rand -hex 32`).
 3. Clients send that key as the bearer token.
 
-Binding to `0.0.0.0` with neither `PORTAL_ENABLED=true` nor `MCP_HTTP_TOKEN`
-set is refused at startup, on purpose.
+Keep `MCP_REQUIRE_AUTH=true` so the service still fails closed.
+
+---
+
+## Authentication model
+
+Read this before exposing the server.
+
+* `/mcp` requires `Authorization: Bearer <token>` whenever **either**
+  `MCP_HTTP_TOKEN` **or** the portal is configured.
+* Binding to a non-loopback address with neither is **refused at startup**.
+* Binding to **loopback** with neither is allowed for local development — but
+  that is also how people run the server behind a proxy, where `/mcp` would be
+  open to everyone. The server now logs a warning, and
+  **`MCP_REQUIRE_AUTH=true`** makes it refuse to start instead. Set it in any
+  proxied deployment.
+* MCP sessions are bound to the credential that created them; one user's key
+  cannot reuse another's session.
+* Each portal key resolves to its owner's Zoho connection; the tool list adapts
+  to the scopes that account actually granted.
+
+---
 
 ## Operations
 
-### Back up the data volume
+### Back up the data
 
-`portal.db` holds every user's **encrypted** Zoho credentials, and the token
-file holds the shared refresh token. Back both up along with `MCP_SECRET_KEY`;
-without the key the database is useless.
+`portal.db` holds every user's **encrypted** Zoho credentials; the token file
+holds the shared refresh token. Back both up **and `MCP_SECRET_KEY`** — without
+the key the database is useless.
+
+Docker (path A/C):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec zoho-mcp \
-  sh -c 'cp /data/portal.db /data/portal.db.bak'
 docker run --rm -v zoho-mcp_zoho_data:/data -v "$PWD":/backup alpine \
   tar czf /backup/zoho-data-$(date +%F).tgz -C /data .
 ```
 
+systemd (path B): `deploy/backup.sh` does a consistent SQLite online backup
+into `/var/backups/zoho-mcp` and prunes old archives.
+
 ### Upgrade
 
 ```bash
-cd /opt/zoho-mcp
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
+# path A
+cd /opt/zoho-mcp && git pull && docker compose -f docker-compose.prod.yml up -d --build
+# path B
+cd /opt/zoho-mcp && git pull && sudo ./deploy/install-systemd.sh && sudo systemctl restart zoho-mcp
 ```
 
-### Logs and status
+### Use the published image
+
+CI builds, smoke-tests and scans the image, then publishes it to GHCR on every
+push to `main` and every `v*` tag:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs --since 1h zoho-mcp
+docker run -d --name zoho-mcp -p 127.0.0.1:8000:8000 \
+  --env-file .env ghcr.io/aceaaroncharles/zoho-mcp:latest
 ```
 
 ### Rotating `MCP_SECRET_KEY`
 
-**Don't**, unless you intend to invalidate every stored connection — the key is
-the only thing that can decrypt them. If it leaks, rotate it and tell every user
-to reconnect their Zoho account.
+Don't, unless you intend to invalidate every stored connection — the key is the
+only thing that can decrypt them. If it leaks, rotate it and tell every user to
+reconnect their Zoho account.
+
+---
 
 ## Hardening
 
-* Caddy has no built-in rate limiter. For `/portal/login`, `/portal/keys`, and
-  `/mcp`, either install the `caddy-ratelimit` plugin or put Cloudflare/nginx in
-  front. With nginx:
+* **Rate-limit** `/portal/login`, `/portal/keys` and `/mcp` at the proxy; the
+  app has no built-in limiter. Caddy needs the `caddy-ratelimit` plugin; with
+  nginx:
 
   ```nginx
   limit_req_zone $binary_remote_addr zone=zoho:10m rate=10r/s;
-  location /mcp        { limit_req zone=zoho burst=20 nodelay; proxy_pass http://127.0.0.1:8000; proxy_buffering off; }
+  location /mcp          { limit_req zone=zoho burst=20 nodelay; proxy_pass http://127.0.0.1:8000; proxy_buffering off; }
   location /portal/login { limit_req zone=zoho burst=5  nodelay; proxy_pass http://127.0.0.1:8000; }
   ```
 
-* Keep `MCP_READ_ONLY=true` if clients should never write to Zoho.
-* Run one replica. SQLite is a single-writer store; scale with a bigger VPS, not
-  with replicas.
-* Keep the host patched and only expose 80/443/SSH.
+* Set `MCP_READ_ONLY=true` if clients should never write to Zoho.
+* Run **one replica**. SQLite is a single-writer store; scale with a bigger VPS,
+  not with replicas.
+* Keep `MCP_ALLOWED_HOSTS` set so DNS-rebinding protection is active.
+* Install/verify unattended upgrades and keep the host patched.
+* Rotate the Zoho client secret and refresh token in the API console if they
+  were ever committed, and purge the Git history afterwards.
+
+---
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 | --- | --- |
-| Caddy: `no certificate` / TLS errors | DNS not pointing at the VPS, or port 80 blocked. |
-| `502 Bad Gateway` | The `zoho-mcp` container is down — check its logs. |
-| Session cookie not set / login loop | `PORTAL_BASE_URL` is not the public `https://` origin. |
-| `invalid_scope` from Zoho | `ZOHO_SCOPE` includes a scope the Zoho client was not approved for; use `all`. |
+| Caddy: certificate errors | DNS not pointing at the VPS, or port 80 blocked. |
+| `502 Bad Gateway` | The app container/process is down — check its logs. |
+| Service exits with `MCP_REQUIRE_AUTH=true but ...` | No `MCP_HTTP_TOKEN` and no portal configured. |
+| Service exits with `Refusing to bind ... non-loopback` | Set `MCP_HTTP_TOKEN`, enable the portal, or bind loopback. |
+| Login loop / cookie not set | `PORTAL_BASE_URL` is not the public `https://` origin. |
+| `invalid_scope` from Zoho | `ZOHO_SCOPE` includes a scope the client was not approved for; use `all`. |
 | `invalid_client` / `invalid redirect uri` | The Zoho client's redirect URI does not exactly match `https://<host>/oauth/zoho/callback`. |
 | `CryptoError` in logs | `MCP_SECRET_KEY` changed, or `portal.db` was copied between environments. |
-| Hermes cannot connect | Run `hermes mcp test zoho` and check the bearer header/key. |
+| A Zoho app returns `403 SCOPE_MISMATCH` | The account/subscription lacks that app, not a code issue. |
+| Hermes cannot connect | Run `hermes mcp test zoho`; check the bearer header/key. |

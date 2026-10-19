@@ -81,3 +81,12 @@ portal.db-*
 /*_REPORT.txt
 /QUICK_START.*
 /SOLUTION_SUMMARY.txt
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!terraform.tfvars.example

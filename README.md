@@ -269,9 +269,18 @@ Clients must send `Authorization: Bearer <MCP_HTTP_TOKEN>` on every request.
 `GET /health` is public and returns `{"status":"ok"}`. A `Dockerfile` and
 `docker-compose.yml` are included for container hosting.
 
-For a complete VPS runbook — Docker Compose, Caddy with automatic HTTPS, the
-multi-tenant portal, backups, and connecting **Hermes Agent** (stdio and hosted
-HTTP) — see **[DEPLOY.md](DEPLOY.md)**.
+> **Loopback is not authentication.** Binding to `127.0.0.1` is allowed without
+> a token for local development, but that is also how people run the server
+> behind a reverse proxy — where `/mcp` would then be open to everyone. Set
+> `MCP_REQUIRE_AUTH=true` to make the server refuse to start unless a credential
+> source (`MCP_HTTP_TOKEN` or the portal) is configured. Any proxied deployment
+> should set it.
+
+For a complete VPS runbook — Docker Compose with Caddy and automatic HTTPS, a
+hardened **systemd** unit, a **cloud-init/Terraform** bootstrap, backups, and
+connecting **Hermes Agent** (stdio and hosted HTTP) — see
+**[DEPLOY.md](DEPLOY.md)**. Common tasks are wrapped by the **[Makefile](Makefile)**
+(`make help`).
 
 Set `MCP_READ_ONLY=true` to block every write operation (POST/PUT/PATCH/DELETE)
 while still allowing reads.
@@ -371,7 +380,8 @@ Before exposing the server publicly:
   public `https://` origin, which also makes the session cookie `Secure`.
 * **Require authentication.** Either `PORTAL_ENABLED=true` (multi-tenant) or
   `MCP_HTTP_TOKEN=<random>` (single tenant). Binding to `0.0.0.0` without one of
-  these is refused at startup.
+  these is refused at startup. Behind a proxy that talks to a loopback bind, set
+  **`MCP_REQUIRE_AUTH=true`** so a missing credential is still fatal.
 * **Set `MCP_ALLOWED_HOSTS`** to your public host (and `MCP_ALLOWED_ORIGINS` if a
   browser calls `/mcp`) so DNS-rebinding protection is active.
 * **Use a strong `MCP_SECRET_KEY`** from a secret manager
@@ -579,6 +589,7 @@ result = convert_lead("lead_id_here", convert_data)
 | `TOKEN_FILE_PATH` | `.zoho_tokens.json` | Path to store OAuth tokens |
 | `MCP_TRANSPORT` | `stdio` | `stdio` or `http` |
 | `MCP_HTTP_TOKEN` | - | Shared bearer token for single-tenant HTTP (or enable the portal) |
+| `MCP_REQUIRE_AUTH` | `false` | Refuse to start unless `MCP_HTTP_TOKEN` or the portal is configured |
 | `MCP_ALLOWED_HOSTS` | SDK default | Comma-separated Host allow-list for DNS-rebinding protection |
 | `PORTAL_ENABLED` | `false` | Serve the multi-tenant connection portal on the same port |
 | `PORTAL_BASE_URL` | `http://localhost:8000` | Public URL used in links and OAuth callbacks |
@@ -605,6 +616,7 @@ result = convert_lead("lead_id_here", convert_data)
 - **Owner-Only Token Storage**: Token files are written atomically with `0600` permissions
 - **Read-Only Mode**: `MCP_READ_ONLY=true` blocks every write operation
 - **Bearer-Authenticated HTTP**: Non-loopback HTTP requires `MCP_HTTP_TOKEN` or the portal
+- **Fail-closed startup**: `MCP_REQUIRE_AUTH=true` refuses to boot without a credential source; a bare loopback bind logs a warning
 - **Encrypted at rest**: The portal encrypts every stored Zoho client secret and token (Fernet)
 - **Per-user isolation**: Each MCP API key maps to one user's Zoho connection; sessions are bound to their key
 - **No Secret Logging**: Credentials and tokens are never written to logs
@@ -670,6 +682,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the development workflow
+(`make setup`, `make check`), commit conventions and CI expectations.
+Notable changes are recorded in **[CHANGELOG.md](CHANGELOG.md)**, and security
+issues should follow **[SECURITY.md](SECURITY.md)** rather than a public issue.
 
 ## 🎆 About JunnAI
 

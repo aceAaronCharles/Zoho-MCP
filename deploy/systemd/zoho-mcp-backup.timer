@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly backup of the Zoho MCP portal database
+Documentation=https://github.com/aceAaronCharles/Zoho-MCP/blob/main/DEPLOY.md
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# Run once shortly after boot if a scheduled run was missed.
+Persistent=true
+RandomizedDelaySec=15m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

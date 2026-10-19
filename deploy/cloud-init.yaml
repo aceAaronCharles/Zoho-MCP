@@ -1,0 +1,130 @@
+#cloud-config
+# ---------------------------------------------------------------------------
+# Bootstrap for the Zoho MCP server on a fresh Ubuntu/Debian VPS.
+#
+# Provider agnostic: paste this into the "user data" / "cloud-init" field of
+# Hetzner Cloud, DigitalOcean, Linode, Oracle Cloud, AWS EC2, ...  The bundled
+# Terraform example fills the placeholders for you.
+#
+# Before using it by hand, replace the placeholders listed here:
+#   @@SITE_ADDRESS@@  public host, e.g. mcp.example.com
+#   @@ACME_EMAIL@@    contact email for Let's Encrypt
+#   @@REPO_URL@@      git clone URL
+#   @@REPO_REF@@      branch or tag to deploy (e.g. main, v1.0.0)
+#   @@AUTOSTART@@     yes | no - bring the stack up automatically
+#
+# No Zoho or OIDC secret is placed in user-data (which is readable from the
+# instance metadata service and the provider console). MCP_SECRET_KEY is
+# generated on the box; everything else is filled in over SSH.
+# ---------------------------------------------------------------------------
+package_update: true
+packages:
+  - git
+  - curl
+  - ca-certificates
+  - ufw
+
+write_files:
+  - path: /usr/local/sbin/zoho-bootstrap.sh
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      exec > >(tee -a /var/log/zoho-bootstrap.log) 2>&1
+
+      SITE_ADDRESS="@@SITE_ADDRESS@@"
+      ACME_EMAIL="@@ACME_EMAIL@@"
+      REPO_URL="@@REPO_URL@@"
+      REPO_REF="@@REPO_REF@@"
+      AUTOSTART="@@AUTOSTART@@"
+      REPO_DIR=/opt/zoho-mcp
+
+      echo "==> installing Docker"
+      if ! command -v docker >/dev/null 2>&1; then
+          curl -fsSL https://get.docker.com | sh
+      fi
+      systemctl enable --now docker
+
+      echo "==> configuring the firewall"
+      ufw allow OpenSSH
+      ufw allow 80/tcp
+      ufw allow 443/tcp
+      ufw allow 443/udp
+      ufw --force enable
+
+      echo "==> fetching the server"
+      if [ ! -d "$REPO_DIR/.git" ]; then
+          git clone --branch "$REPO_REF" "$REPO_URL" "$REPO_DIR"
+      else
+          git -C "$REPO_DIR" fetch --all --tags
+          git -C "$REPO_DIR" checkout "$REPO_REF"
+          git -C "$REPO_DIR" pull --ff-only || true
+      fi
+      cd "$REPO_DIR"
+
+      echo "==> preparing .env"
+      if [ ! -f .env ]; then
+          cp deploy/env.prod.example .env
+          SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          SITE="$SITE_ADDRESS" EMAIL="$ACME_EMAIL" KEY="$SECRET" python3 - <<'PY'
+      import os
+      import pathlib
+
+      site = os.environ["SITE"]
+      path = pathlib.Path(".env")
+      text = path.read_text()
+      text = text.replace("SITE_ADDRESS=mcp.example.com", f"SITE_ADDRESS={site}")
+      text = text.replace("ACME_EMAIL=you@example.com", f"ACME_EMAIL={os.environ['EMAIL']}")
+      text = text.replace("PORTAL_BASE_URL=https://mcp.example.com", f"PORTAL_BASE_URL=https://{site}")
+      text = text.replace("MCP_ALLOWED_HOSTS=mcp.example.com", f"MCP_ALLOWED_HOSTS={site}")
+      text = text.replace("MCP_ALLOWED_ORIGINS=https://mcp.example.com", f"MCP_ALLOWED_ORIGINS=https://{site}")
+      text = text.replace("MCP_SECRET_KEY=", f"MCP_SECRET_KEY={os.environ['KEY']}", 1)
+      path.write_text(text)
+      PY
+          chmod 600 .env
+      fi
+
+      if [ "$AUTOSTART" = "yes" ]; then
+          echo "==> starting the stack"
+          docker compose -f docker-compose.prod.yml up -d --build
+      fi
+
+      echo "==> bootstrap finished at $(date -Is)"
+
+  - path: /root/NEXT-STEPS.txt
+    owner: root:root
+    permissions: "0600"
+    content: |
+      Zoho MCP server - bootstrap finished.
+      Full log:  /var/log/zoho-bootstrap.log
+
+      The repository is at /opt/zoho-mcp and .env has SITE_ADDRESS, ACME_EMAIL
+      and a freshly generated MCP_SECRET_KEY. It still needs your Zoho and
+      identity-provider settings.
+
+      1. Fill in the identity provider (OIDC) block:
+             sudoedit /opt/zoho-mcp/.env
+
+         Register this redirect URI with your provider:
+             https://@@SITE_ADDRESS@@/portal/auth/callback
+
+      2. Start (or restart) the stack:
+             cd /opt/zoho-mcp
+             sudo docker compose -f docker-compose.prod.yml up -d --build
+
+      3. Verify:
+             curl -fsS https://@@SITE_ADDRESS@@/health
+             sudo docker compose -f docker-compose.prod.yml logs -f zoho-mcp
+
+      4. Open https://@@SITE_ADDRESS@@/portal, sign in, and connect Zoho.
+         Each user registers their own Zoho client whose redirect URI is:
+             https://@@SITE_ADDRESS@@/oauth/zoho/callback
+
+      Back up /opt/zoho-mcp/.env and the MCP_SECRET_KEY value: without it the
+      portal database cannot be decrypted. Back up the data volume too:
+             sudo docker run --rm -v zoho-mcp_zoho_data:/data \
+                  -v "$PWD":/backup alpine tar czf /backup/zoho-data.tgz -C /data .
+
+runcmd:
+  - [ bash, -lc, "/usr/local/sbin/zoho-bootstrap.sh" ]

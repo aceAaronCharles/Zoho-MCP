@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. Prefer `export HCLOUD_TOKEN=...`
+# over putting the API token in this file.
+
+ssh_key_name = "my-laptop"
+site_address = "mcp.example.com"
+acme_email   = "you@example.com"
+
+# Narrow this to your own address. The default allows SSH from anywhere.
+ssh_allowed_cidrs = ["203.0.113.4/32"]
+
+# location    = "fsn1"
+# server_type = "cx22"
+# repo_ref    = "main"
+# autostart   = "no"   # "yes" brings the stack up during cloud-init
