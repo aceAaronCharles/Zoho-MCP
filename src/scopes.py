@@ -1,26 +1,40 @@
 """
 Zoho OAuth scope helpers.
 
-``ZOHO_SCOPE=all`` is a convenience preset that expands to every scope this
-server knows about.  ``ZOHO_SCOPE=recommended`` expands to the smaller set that
-has been validated end to end.  Zoho still requires each API to be authorised
-for the client, and a refresh token can only ever contain scopes that were
-granted when it was created.
+Scope presets:
+
+``all``
+    Every scope for apps whose names were verified against Zoho's published API
+    documentation.  This is the default because Zoho rejects the whole consent
+    request with ``invalid_scope`` if a single scope is unknown, so shipping
+    unverified guesses in the default set would break onboarding.
+
+``recommended``
+    The small, end-to-end validated core set (the reference token used while
+    developing the server).
+
+``everything``
+    ``all`` plus the unverified, best-effort scopes.  Use this only if you have
+    confirmed the extra scopes are accepted by your Zoho client; otherwise Zoho
+    returns ``invalid_scope``.
+
+Set ``ZOHO_SCOPE_INCLUDE_UNVERIFIED=true`` to append the unverified scopes to
+``all`` without switching presets.
 
 To trim a preset without writing the whole list, set ``ZOHO_SCOPE_EXCLUDE`` to
 one or more comma/space separated scopes::
 
     ZOHO_SCOPE=all
-    ZOHO_SCOPE_EXCLUDE=ZohoVault.secrets.ALL,ZohoTeamInbox.channels.ALL
+    ZOHO_SCOPE_EXCLUDE=ZohoVault.secrets.ALL,ZohoCalendar.event.ALL
 """
 
 import os
 from typing import Dict, List
 
 try:  # Support both ``import src.scopes`` and ``python src/server.py``.
-    from .zoho_apps import APP_CONFIGS
+    from .zoho_apps import APP_CONFIGS, app_is_verified
 except ImportError:  # pragma: no cover - script mode
-    from zoho_apps import APP_CONFIGS
+    from zoho_apps import APP_CONFIGS, app_is_verified
 
 
 # Scopes present in the reference token used while developing the server.
@@ -52,52 +66,12 @@ KNOWN_SCOPES: List[str] = [
     "ZohoMeeting.meeting.ALL",
 ]
 
-# Additional scopes used by apps that do not have dedicated tools yet.  The
-# generic ``zoho_api_request`` tool can use them once the refresh token has
-# been granted the matching permission.
-EXTRA_SCOPES: List[str] = [
-    "ZohoSalesIQ.modules.ALL",
-    "ZohoCampaigns.campaign.ALL",
-    "ZohoSocial.data.ALL",
-    "ZohoForms.form.ALL",
-    "ZohoSurvey.surveys.ALL",
-    "ZohoInvoice.fullaccess.all",
-    "ZohoExpense.fullaccess.all",
-    "ZohoSubscriptions.fullaccess.all",
-    "ZohoCommerce.fullaccess.all",
-    "ZohoAssist.session.ALL",
-    "ZohoSprints.projects.ALL",
-    "ZohoBugTracker.projects.ALL",
-    "ZohoConnect.network.ALL",
-    "ZohoCliq.channels.ALL",
-    "ZohoCliq.messages.ALL",
-    "ZohoMeeting.recording.ALL",
+# Verified scopes that are not expressed by a single app's ``required_scopes``.
+VERIFIED_EXTRA_SCOPES: List[str] = [
+    "ZohoPeople.employee.ALL",
+    "ZohoPeople.timetracker.ALL",
     "ZohoMail.messages.ALL",
     "ZohoMail.folders.ALL",
-    "ZohoWorkDrive.files.ALL",
-    "ZohoWorkDrive.team.ALL",
-    "ZohoWorkDrive.workspace.ALL",
-    "ZohoWorkDrive.users.ALL",
-    "ZohoWriter.documents.ALL",
-    "ZohoSheet.spreadsheets.ALL",
-    "ZohoShow.presentations.ALL",
-    "ZohoFlow.flows.ALL",
-    "ZohoCatalyst.projects.ALL",
-    "ZohoFleet.modules.ALL",
-    "ZohoFSM.modules.ALL",
-    "ZohoSign.documents.ALL",
-    "ZohoContracts.contracts.ALL",
-    "ZohoIoT.devices.ALL",
-    "ZohoBookings.bookings.ALL",
-    "ZohoCalendar.calendar.ALL",
-    "ZohoVault.secrets.ALL",
-    "ZohoDirectory.users.ALL",
-    "ZohoLearn.courses.ALL",
-    "ZohoPractice.clients.ALL",
-    "ZohoPayroll.fullaccess.all",
-    "ZohoTeamInbox.channels.ALL",
-    "ZohoMarketingHub.campaigns.ALL",
-    "ZohoPageSense.projects.ALL",
 ]
 
 
@@ -117,10 +91,12 @@ def _dedupe(scopes: List[str]) -> List[str]:
     return result
 
 
-def _catalog_scopes() -> List[str]:
-    """Return the scopes needed to reach every app in the catalog."""
+def _catalog_scopes(*, verified: bool) -> List[str]:
+    """Return consent scopes for catalog apps with the given verification."""
     scopes: List[str] = []
     for config in APP_CONFIGS.values():
+        if app_is_verified(config) != verified:
+            continue
         for scope in config["required_scopes"]:
             # ``ZohoCreator`` is an app-level shorthand used for matching, not
             # a scope that should be sent on the consent URL.
@@ -130,11 +106,16 @@ def _catalog_scopes() -> List[str]:
     return scopes
 
 
-# Every scope this server knows about, derived from the app catalog so the two
-# can never drift apart.
+# Verified scopes: safe to put on a consent URL.
 FULL_SCOPES: List[str] = _dedupe(
-    _catalog_scopes() + KNOWN_SCOPES + EXTRA_SCOPES
+    _catalog_scopes(verified=True) + KNOWN_SCOPES + VERIFIED_EXTRA_SCOPES
 )
+
+# Unverified scopes: best effort; a wrong name fails the whole consent request.
+UNVERIFIED_SCOPES: List[str] = _dedupe(_catalog_scopes(verified=False))
+
+# ``everything`` is *all* + the unverified additions.
+EVERYTHING_SCOPES: List[str] = _dedupe(FULL_SCOPES + UNVERIFIED_SCOPES)
 
 # A smaller, validated set for users who hit a Zoho ``invalid_scope`` error.
 RECOMMENDED_SCOPES: List[str] = _dedupe(KNOWN_SCOPES)
@@ -142,7 +123,10 @@ RECOMMENDED_SCOPES: List[str] = _dedupe(KNOWN_SCOPES)
 SCOPE_PRESETS: Dict[str, List[str]] = {
     "all": FULL_SCOPES,
     "recommended": RECOMMENDED_SCOPES,
+    "everything": EVERYTHING_SCOPES,
 }
+
+_ALL_ALIASES = {"all", "*", "full", "fullaccess"}
 
 
 def _excluded_scopes() -> set:
@@ -150,10 +134,19 @@ def _excluded_scopes() -> set:
     return {scope.strip().lower() for scope in raw.split() if scope.strip()}
 
 
+def _include_unverified() -> bool:
+    return (os.getenv("ZOHO_SCOPE_INCLUDE_UNVERIFIED") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def is_all_scopes(scope_string: str) -> bool:
-    """Return True when *scope_string* requests the full-access preset."""
+    """Return True when *scope_string* requests a full-access preset."""
     value = (scope_string or "").strip().lower()
-    return value in {"all", "*", "full", "fullaccess"}
+    return value in _ALL_ALIASES or value == "everything"
 
 
 def resolve_scopes(scope_string: str) -> List[str]:
@@ -163,8 +156,12 @@ def resolve_scopes(scope_string: str) -> List[str]:
         return []
 
     key = value.lower()
-    if key in {"all", "*", "full", "fullaccess"}:
+    if key == "everything":
+        scopes = list(EVERYTHING_SCOPES)
+    elif key in _ALL_ALIASES:
         scopes = list(FULL_SCOPES)
+        if _include_unverified():
+            scopes = _dedupe(scopes + UNVERIFIED_SCOPES)
     elif key == "recommended":
         scopes = list(RECOMMENDED_SCOPES)
     else:
@@ -181,7 +178,8 @@ def expand_scopes(scope_string: str) -> str:
     """
     Expand a scope preset into a comma-separated scope list.
 
-    ``all``/``*`` expands to :data:`FULL_SCOPES`; ``recommended`` expands to
-    :data:`RECOMMENDED_SCOPES`; any other value is treated as an explicit list.
+    ``all``/``*`` expands to :data:`FULL_SCOPES`, ``recommended`` expands to
+    :data:`RECOMMENDED_SCOPES`, ``everything`` expands to
+    :data:`EVERYTHING_SCOPES`; any other value is treated as an explicit list.
     """
     return ",".join(resolve_scopes(scope_string))

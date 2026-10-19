@@ -82,7 +82,7 @@ class TestAppRegistry:
     
     def test_get_apps_by_category(self):
         """Test getting apps by category."""
-        scope = "ZohoCRM.modules.ALL,ZohoSalesIQ.modules.ALL"
+        scope = "ZohoCRM.modules.ALL,SalesIQ.portals.ALL"
         registry = AppRegistry(scope)
         
         sales_apps = registry.get_apps_by_category("Sales")

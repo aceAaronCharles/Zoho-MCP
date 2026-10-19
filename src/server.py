@@ -310,6 +310,7 @@ def list_zoho_apps() -> Dict[str, Any]:
                 "api_path": app.api_path,
                 "base_url": api_router.get_base_url(app.name),
                 "enabled": app.enabled,
+                "scopes_verified": app.scopes_verified,
                 "required_scopes": app.required_scopes,
                 "missing_scopes": registry.missing_scopes(app.name),
             }
@@ -321,17 +322,21 @@ def list_zoho_apps() -> Dict[str, Any]:
         "enabled_count": enabled_count,
         "granted_scopes": list(registry.scopes),
         "scope_presets": {
-            "all": "every app this server knows about",
+            "all": "verified scopes for every app (safe default)",
             "recommended": "validated core set for the apps with dedicated tools",
+            "everything": "all plus best-effort unverified scopes",
         },
         "apps": apps,
         "usage": "Call zoho_api_request(app_name='Books', endpoint='invoices', params={'organization_id': '...'})",
         "note": (
             "enabled shows whether the local scope heuristic matched. Apps marked "
             "disabled may still work when the token actually has the scope; Zoho "
-            "performs the final authorisation check. To enable more apps, call "
-            "get_zoho_authorization_url(scopes='all') and approve the consent, or "
-            "re-authorize through the connection portal."
+            "performs the final authorisation check. ``scopes_verified`` is False "
+            "when the app's scope names could not be confirmed in Zoho's docs and "
+            "are therefore left out of the default ``all`` preset. To enable more "
+            "apps, call get_zoho_authorization_url(scopes='all'), or "
+            "scopes='everything' to also attempt the unverified apps, and approve "
+            "the consent."
         ),
     }
 
@@ -351,7 +356,8 @@ def get_zoho_authorization_url(
     portal, which handles the OAuth callback automatically.
 
     Args:
-        scopes: ``all``, ``recommended``, or an explicit comma/space list.
+        scopes: ``all``, ``recommended``, ``everything``, or an explicit
+            comma/space list.
         redirect_uri: Override the callback registered in the Zoho API client.
 
     Returns:
@@ -413,7 +419,7 @@ def get_zoho_authorization_url(
         "status": "success",
         "authorization_url": url,
         "scope_preset": requested.lower()
-        if requested.lower() in {"all", "recommended"}
+        if requested.lower() in {"all", "recommended", "everything"}
         else "custom",
         "scopes": resolved.split(","),
         "redirect_uri": effective_redirect,
@@ -462,7 +468,7 @@ def get_configuration_status() -> Dict[str, Any]:
                 for app in registry.list_all_apps()
                 if registry.missing_scopes(app.name)
             ),
-            "scope_presets": ["all", "recommended"],
+            "scope_presets": ["all", "recommended", "everything"],
         },
         "next_steps": []
         if (auth is not None or context is not None)
@@ -545,12 +551,14 @@ def authenticate_zoho(
     Authenticate with Zoho, optionally requesting additional API scopes.
 
     Opens a browser window for the OAuth consent flow when needed.  Use
-    ``scopes="all"`` (or ``"recommended"``) together with ``force=True`` to
-    re-consent and grant more permissions; the server then reloads the app
-    registry.  Hosted deployments should use the connection portal instead.
+    ``scopes="all"`` (verified apps) or ``scopes="everything"`` (also attempts
+    the unverified apps) together with ``force=True`` to re-consent and grant
+    more permissions; the server then reloads the app registry.  Hosted
+    deployments should use the connection portal instead.
 
     Args:
-        scopes: Scope preset (``all``, ``recommended``) or an explicit list.
+        scopes: Scope preset (``all``, ``recommended``, ``everything``) or an
+            explicit list.
         force: Re-run the browser consent flow even if the token is valid.
 
     Returns:

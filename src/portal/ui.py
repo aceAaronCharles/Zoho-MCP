@@ -304,10 +304,12 @@ encrypted and only used to obtain tokens for this server.</p>
         <input name="scopes" value="{scopes}">
       </div>
     </div>
-    <p class="muted">Use <code>all</code> for every app this server supports,
-    <code>recommended</code> for the validated core set, or paste a
-    comma/space-separated list of Zoho scopes. If Zoho rejects a scope, use
-    <code>recommended</code> or remove the offending scope.</p>
+    <p class="muted">Use <code>all</code> for the verified scopes of every app
+    this server supports, <code>recommended</code> for the validated core set,
+    <code>everything</code> to also attempt the unverified apps, or paste a
+    comma/space-separated list of Zoho scopes. If Zoho rejects a scope with
+    <code>invalid_scope</code>, use <code>recommended</code> or remove the
+    offending scope.</p>
     <div class="row" style="margin-top:16px">
       <button type="submit">Save and authorize</button>
       <a class="btn ghost" href="/portal">Cancel</a>

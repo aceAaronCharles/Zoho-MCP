@@ -4,13 +4,19 @@ from urllib.parse import parse_qs, urlparse
 
 from src.app_registry import AppRegistry
 from src.scopes import (
+    EVERYTHING_SCOPES,
     FULL_SCOPES,
     RECOMMENDED_SCOPES,
+    UNVERIFIED_SCOPES,
     expand_scopes,
     is_all_scopes,
     resolve_scopes,
 )
-from src.zoho_apps import APP_CONFIGS
+from src.zoho_apps import (
+    APP_CONFIGS,
+    UNVERIFIED_APP_NAMES,
+    VERIFIED_APP_NAMES,
+)
 from src.zoho_auth import accounts_domain_for, build_authorization_url
 
 
@@ -59,6 +65,55 @@ def test_recommended_preset_is_the_validated_set():
     assert "ZohoVault.secrets.ALL" not in RECOMMENDED_SCOPES
 
 
+def test_all_preset_excludes_unverified_scopes():
+    # A single unknown scope fails the entire consent, so ``all`` only ships
+    # scopes confirmed against Zoho's docs.
+    assert "ZohoTeamInbox.channels.ALL" not in FULL_SCOPES
+    assert "ZohoTeamInbox.channels.ALL" in UNVERIFIED_SCOPES
+    assert "WorkDrive.files.ALL" in FULL_SCOPES
+    assert "ZohoSalesIQ.modules.ALL" not in FULL_SCOPES
+    assert "SalesIQ.portals.ALL" in FULL_SCOPES
+    assert "ZohoMarketingAutomation.campaign.ALL" in FULL_SCOPES
+    assert "PageSense.experiments.READ" in FULL_SCOPES
+
+
+def test_everything_preset_includes_unverified_scopes():
+    scopes = resolve_scopes("everything")
+    for scope in UNVERIFIED_SCOPES:
+        assert scope in scopes
+    assert "ZohoCRM.modules.ALL" in scopes
+    assert len(EVERYTHING_SCOPES) == len(FULL_SCOPES) + len(UNVERIFIED_SCOPES)
+
+
+def test_include_unverified_env_appends(monkeypatch):
+    monkeypatch.setenv("ZOHO_SCOPE_INCLUDE_UNVERIFIED", "true")
+    scopes = resolve_scopes("all")
+    assert "ZohoTeamInbox.channels.ALL" in scopes
+
+
+def test_app_verification_flags_partition_the_catalog():
+    assert set(VERIFIED_APP_NAMES).isdisjoint(UNVERIFIED_APP_NAMES)
+    assert "CRM" in VERIFIED_APP_NAMES
+    assert "TeamInbox" in UNVERIFIED_APP_NAMES
+    assert len(VERIFIED_APP_NAMES) + len(UNVERIFIED_APP_NAMES) == len(APP_CONFIGS)
+
+
+def test_known_wrong_scopes_are_gone():
+    for stale in [
+        "ZohoSalesIQ.modules.ALL",
+        "ZohoWorkDrive.files.ALL",
+        "ZohoSheet.spreadsheets.ALL",
+        "ZohoBookings.bookings.ALL",
+        "ZohoAssist.session.ALL",
+        "ZohoMarketingHub.campaigns.ALL",
+        "ZohoPageSense.projects.ALL",
+        "ZohoSocial.data.ALL",
+        "ZohoConnect.network.ALL",
+        "ZohoMeeting.recording.ALL",
+    ]:
+        assert stale not in FULL_SCOPES
+
+
 def test_explicit_scope_list_accepts_commas_and_spaces():
     scopes = resolve_scopes(
         "ZohoCRM.modules.ALL, ZohoBooks.fullaccess.all Desk.tickets.ALL"
@@ -73,11 +128,11 @@ def test_explicit_scope_list_accepts_commas_and_spaces():
 def test_scope_exclusion(monkeypatch):
     monkeypatch.setenv(
         "ZOHO_SCOPE_EXCLUDE",
-        "ZohoVault.secrets.ALL, ZohoTeamInbox.channels.ALL",
+        "ZohoVault.secrets.ALL, ZohoCalendar.event.ALL",
     )
     scopes = resolve_scopes("all")
     assert "ZohoVault.secrets.ALL" not in scopes
-    assert "ZohoTeamInbox.channels.ALL" not in scopes
+    assert "ZohoCalendar.event.ALL" not in scopes
     assert "ZohoCRM.modules.ALL" in scopes
 
 

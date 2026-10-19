@@ -35,6 +35,7 @@ class ZohoAppConfig:
     api_version: str
     category: str
     custom_domain: Optional[str] = None
+    scopes_verified: bool = True
 
     def to_dict(self) -> Dict:
         """Convert config to dictionary."""
@@ -46,6 +47,7 @@ class ZohoAppConfig:
             "category": self.category,
             "custom_domain": self.custom_domain,
             "domain_template": self.custom_domain,
+            "scopes_verified": self.scopes_verified,
         }
 
 
@@ -149,6 +151,7 @@ class AppRegistry:
                 api_version=config["api_version"],
                 category=config["category"],
                 custom_domain=config.get("custom_domain"),
+                scopes_verified=bool(config.get("scopes_verified", True)),
             )
             if enabled:
                 logger.debug("App '%s' enabled", app_name)
@@ -196,6 +199,7 @@ class AppRegistry:
             "apps": {
                 app.name: {
                     "enabled": app.enabled,
+                    "scopes_verified": app.scopes_verified,
                     "required_scopes": list(app.required_scopes),
                     "missing_scopes": self.missing_scopes(app.name),
                 }

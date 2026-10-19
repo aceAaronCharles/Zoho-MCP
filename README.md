@@ -53,7 +53,10 @@ Show, Learn
 **IoT**: IoT
 
 `list_zoho_apps()` returns the live catalog with each app's base URL, API path,
-required scopes, and any `missing_scopes` for the current grant.
+required scopes, a `scopes_verified` flag, and any `missing_scopes` for the
+current grant. Apps whose scope names could not be confirmed against Zoho's
+published API docs are marked `scopes_verified: false` and are left out of the
+default consent set (see [Enabling every app](#enabling-every-app)).
 
 ## ✨ Features
 
@@ -215,9 +218,23 @@ error from `get_configuration_status()`.
 
 ### Enabling every app
 
-`ZOHO_SCOPE=all` expands to the scopes for all 46 catalog apps. A refresh token
-keeps the scopes it was granted with, so after changing `ZOHO_SCOPE` you must
-re-consent:
+Scope presets:
+
+| Preset | Contents |
+| --- | --- |
+| `all` (default) | Scope names verified against Zoho's published API docs. |
+| `recommended` | The validated 23-scope core set (the reference token). |
+| `everything` | `all` plus the best-effort *unverified* app scopes. |
+
+Zoho rejects the whole consent request with `invalid_scope` if a single scope
+is unknown, so `all` deliberately ships only verified scopes. The unverified
+apps (for example Forms, Survey, Sprints, BugTracker, TeamInbox, Learn,
+Practice, Payroll, Fleet, FSM, Flow, Writer, Show, Contracts, IoT, Connect and
+Commerce) stay in the catalog and remain callable — they are simply excluded
+from the default consent set until their scopes are confirmed.
+
+A refresh token keeps the scopes it was granted with, so after changing the
+preset you must re-consent:
 
 - **Local / stdio**: set `ZOHO_SCOPE=all`, then call
   `authenticate_zoho(scopes="all", force=True)` from your MCP client. It opens
@@ -227,9 +244,10 @@ re-consent:
 - **Manual**: call `get_zoho_authorization_url(scopes="all")` to get a consent
   URL, then exchange the code as above.
 
-If Zoho rejects the consent with `invalid_scope`, use
-`ZOHO_SCOPE=recommended` (the validated 23-scope core set) or trim specific
-scopes with `ZOHO_SCOPE_EXCLUDE=Scope.One,Scope.Two`. Apps always appear in the
+To also attempt the unverified apps, use the `everything` preset (or set
+`ZOHO_SCOPE_INCLUDE_UNVERIFIED=true` to append them to `all`). If Zoho replies
+with `invalid_scope`, fall back to `recommended` or drop the offending names
+with `ZOHO_SCOPE_EXCLUDE=Scope.One,Scope.Two`. Apps always appear in the
 catalog; scopes only control whether your token can call them.
 
 ## 🌐 Hosting over HTTP
@@ -546,8 +564,9 @@ result = convert_lead("lead_id_here", convert_data)
 | `ZOHO_CLIENT_SECRET` | - | **Required**: Your Zoho app client secret |
 | `ZOHO_REFRESH_TOKEN` | - | **Required for headless use**: long-lived refresh token |
 | `ZOHO_REDIRECT_URI` | `http://localhost:8080/callback` | OAuth redirect URI (interactive flow only) |
-| `ZOHO_SCOPE` | `all` | Scope preset (`all`, `recommended`) or an explicit list |
+| `ZOHO_SCOPE` | `all` | Scope preset (`all`, `recommended`, `everything`) or an explicit list |
 | `ZOHO_SCOPE_EXCLUDE` | - | Comma/space-separated scopes to drop from a preset |
+| `ZOHO_SCOPE_INCLUDE_UNVERIFIED` | `false` | Append best-effort unverified scopes to the `all` preset |
 | `ZOHO_DC` | `com` | Data centre suffix: `com`, `eu`, `in`, `com.au`, `jp`, `ca`, ... |
 | `ZOHO_API_DOMAIN` | derived from DC | Override the Zoho API base URL |
 | `ZOHO_ACCOUNTS_DOMAIN` | derived from DC | Override the Zoho accounts URL |

@@ -69,3 +69,15 @@ portal.db-*
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Scratch artifacts: local reports and one-off debug scripts
+/scratch/
+/check_*.py
+/inspect_*.py
+/diagnose_*.py
+/reauth_*.py
+/*_REPORT.md
+/*_report.md
+/*_REPORT.txt
+/QUICK_START.*
+/SOLUTION_SUMMARY.txt
