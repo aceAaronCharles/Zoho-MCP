@@ -1,0 +1,32 @@
+# Caddy configuration for the Zoho MCP server.
+#
+# SITE_ADDRESS and ACME_EMAIL are injected by docker-compose.prod.yml from the
+# project .env file. Caddy obtains and renews a Let's Encrypt certificate
+# automatically once the DNS A/AAAA record points at this host.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	# The MCP streamable-HTTP transport keeps a response open for server-sent
+	# events. Stream it through immediately instead of buffering.
+	reverse_proxy zoho-mcp:8000 {
+		flush_interval -1
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+
+	log {
+		output stdout
+		format console
+	}
+
+	# No built-in rate limiting: add a plugin or put an nginx/Cloudflare layer
+	# in front if you need it. See DEPLOY.md ("Hardening").
+}

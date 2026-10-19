@@ -1,0 +1,53 @@
+# Production stack for a VPS: the Zoho MCP server behind Caddy (automatic HTTPS).
+#
+#   cp deploy/env.prod.example .env     # then fill it in
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# The application container is NOT published on the host; only Caddy listens on
+# 80/443 and proxies to it over the compose network. Deliberately does not use
+# the root docker-compose.yml, which is the single-host (loopback) variant.
+#
+# Architecture:
+#   Internet --443--> caddy --http--> zoho-mcp:8000  (/mcp, /portal, /health)
+
+services:
+  zoho-mcp:
+    build: .
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8000"
+      TOKEN_FILE_PATH: /data/.zoho_tokens.json
+      PORTAL_DB_PATH: /data/portal.db
+      # Empty => log to stdout so `docker compose logs` shows everything.
+      LOG_FILE_PATH: ""
+    volumes:
+      # Persists the token file and the encrypted portal database.
+      - zoho_data:/data
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - zoho-mcp
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  zoho_data:
+  caddy_data:
+  caddy_config:

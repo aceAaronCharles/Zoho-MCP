@@ -269,6 +269,10 @@ Clients must send `Authorization: Bearer <MCP_HTTP_TOKEN>` on every request.
 `GET /health` is public and returns `{"status":"ok"}`. A `Dockerfile` and
 `docker-compose.yml` are included for container hosting.
 
+For a complete VPS runbook — Docker Compose, Caddy with automatic HTTPS, the
+multi-tenant portal, backups, and connecting **Hermes Agent** (stdio and hosted
+HTTP) — see **[DEPLOY.md](DEPLOY.md)**.
+
 Set `MCP_READ_ONLY=true` to block every write operation (POST/PUT/PATCH/DELETE)
 while still allowing reads.
 

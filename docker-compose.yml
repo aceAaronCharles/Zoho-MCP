@@ -2,7 +2,10 @@ services:
   zoho-mcp:
     build: .
     ports:
-      - "8000:8000"
+      # Bound to loopback by default: put a TLS-terminating proxy in front
+      # (see DEPLOY.md and docker-compose.prod.yml). Change to "8000:8000" only
+      # if you are deliberately serving plain HTTP on a trusted network.
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
