@@ -1,0 +1,23 @@
+services:
+  zoho-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8000"
+      TOKEN_FILE_PATH: /data/.zoho_tokens.json
+      # Connection portal (enable with PORTAL_ENABLED=true in .env).
+      PORTAL_DB_PATH: /data/portal.db
+      LOG_LEVEL: INFO
+    volumes:
+      # Persist the token file and portal database (encrypted credentials)
+      # across container restarts.
+      - zoho_tokens:/data
+    restart: unless-stopped
+
+volumes:
+  zoho_tokens:

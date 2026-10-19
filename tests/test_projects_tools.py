@@ -66,11 +66,11 @@ class TestProjectsTools:
         
         if 'projects_get_portals' in registered_tools:
             projects_get_portals = registered_tools['projects_get_portals']
-            projects_get_portals(None)
+            projects_get_portals()
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Projects"
-            assert call_args[1]['endpoint'] == "portals"
+            assert call_args[1]['endpoint'] == "portals/"
             assert call_args[1]['method'] == "GET"
     
     def test_projects_get_projects_call(self, mock_router):
@@ -91,7 +91,7 @@ class TestProjectsTools:
         
         if 'projects_get_projects' in registered_tools:
             projects_get_projects = registered_tools['projects_get_projects']
-            projects_get_projects(None, portal_id="12345", page=1, per_page=50)
+            projects_get_projects(portal_id="12345", page=1, per_page=50)
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Projects"
@@ -117,7 +117,7 @@ class TestProjectsTools:
         
         if 'projects_get_tasks' in registered_tools:
             projects_get_tasks = registered_tools['projects_get_tasks']
-            projects_get_tasks(None, portal_id="12345", project_id="67890", status="open")
+            projects_get_tasks(portal_id="12345", project_id="67890", status="open")
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Projects"
@@ -143,7 +143,7 @@ class TestProjectsTools:
         if 'projects_create_task' in registered_tools:
             projects_create_task = registered_tools['projects_create_task']
             task_data = {'name': 'New Task', 'description': 'Task description'}
-            projects_create_task(None, portal_id="12345", project_id="67890", task_data=task_data)
+            projects_create_task(portal_id="12345", project_id="67890", task_data=task_data)
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Projects"

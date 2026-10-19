@@ -1,256 +1,150 @@
 """
 Zoho Books Tools
 MCP tools for Zoho Books financial operations.
+
+``organization_id`` is optional.  When omitted the router discovers the first
+organisation from ``GET /books/v3/organizations`` and adds it as the
+``organization_id`` query parameter (the Books API does not accept it in the
+path).
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, Optional
+
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+def _org_path(organization_id: Optional[str]) -> Optional[str]:
+    """Return the legacy path fragment, or None to trigger auto-discovery."""
+    return f"organization/{organization_id}" if organization_id else None
+
+
 def register_books_tools(mcp, api_router, app_registry):
-    """
-    Register Zoho Books tools with MCP server.
-    
-    Args:
-        mcp: FastMCP server instance
-        api_router: APIRouter instance
-        app_registry: AppRegistry instance
-    """
-    if not app_registry.is_app_enabled("Books"):
-        logger.info("Zoho Books is not enabled, skipping Books tools registration")
-        return
-    
+    """Register Zoho Books tools with the MCP server."""
+
     logger.info("Registering Zoho Books tools")
-    
+
     @mcp.tool()
     def books_get_invoices(
-        ctx,
-        organization_id: str,
         page: int = 1,
-        per_page: int = 200
+        per_page: int = 200,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Get invoices from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            page: Page number (default: 1)
-            per_page: Records per page (default: 200)
-        
-        Returns:
-            Dict containing invoices data
-        """
-        params = {
-            'page': page,
-            'per_page': per_page
-        }
-        
+        """Get invoices from Zoho Books."""
         return api_router.make_request(
             app_name="Books",
             endpoint="invoices",
             method="GET",
-            params=params,
-            additional_path=f"organization/{organization_id}"
+            params={"page": page, "per_page": per_page},
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_get_invoice_by_id(
-        ctx,
-        organization_id: str,
-        invoice_id: str
+        invoice_id: str, organization_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Get a specific invoice by ID from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            invoice_id: Invoice ID
-        
-        Returns:
-            Dict containing invoice details
-        """
+        """Get a specific invoice by ID."""
         return api_router.make_request(
             app_name="Books",
             endpoint=f"invoices/{invoice_id}",
             method="GET",
-            additional_path=f"organization/{organization_id}"
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_create_invoice(
-        ctx,
-        organization_id: str,
-        invoice_data: Dict[str, Any]
+        invoice_data: Dict[str, Any], organization_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Create a new invoice in Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            invoice_data: Dictionary containing invoice fields (customer_id, line_items, etc.)
-        
-        Returns:
-            Dict containing created invoice information
-        """
+        """Create a new invoice (invoice_data: customer_id, line_items, ...)."""
         return api_router.make_request(
             app_name="Books",
             endpoint="invoices",
             method="POST",
             data=invoice_data,
-            additional_path=f"organization/{organization_id}"
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_update_invoice(
-        ctx,
-        organization_id: str,
         invoice_id: str,
-        invoice_data: Dict[str, Any]
+        invoice_data: Dict[str, Any],
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Update an existing invoice in Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            invoice_id: Invoice ID to update
-            invoice_data: Dictionary containing fields to update
-        
-        Returns:
-            Dict containing updated invoice information
-        """
+        """Update an existing invoice."""
         return api_router.make_request(
             app_name="Books",
             endpoint=f"invoices/{invoice_id}",
             method="PUT",
             data=invoice_data,
-            additional_path=f"organization/{organization_id}"
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_get_customers(
-        ctx,
-        organization_id: str,
         page: int = 1,
-        per_page: int = 200
+        per_page: int = 200,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Get customers from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            page: Page number (default: 1)
-            per_page: Records per page (default: 200)
-        
-        Returns:
-            Dict containing customers data
-        """
-        params = {
-            'page': page,
-            'per_page': per_page
-        }
-        
+        """Get customers from Zoho Books."""
         return api_router.make_request(
             app_name="Books",
             endpoint="contacts",
             method="GET",
-            params=params,
-            additional_path=f"organization/{organization_id}"
+            params={"page": page, "per_page": per_page},
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_get_vendors(
-        ctx,
-        organization_id: str,
         page: int = 1,
-        per_page: int = 200
+        per_page: int = 200,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Get vendors from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            page: Page number (default: 1)
-            per_page: Records per page (default: 200)
-        
-        Returns:
-            Dict containing vendors data
-        """
-        params = {
-            'page': page,
-            'per_page': per_page,
-            'contact_type': 'vendor'
-        }
-        
+        """Get vendors from Zoho Books."""
         return api_router.make_request(
             app_name="Books",
             endpoint="contacts",
             method="GET",
-            params=params,
-            additional_path=f"organization/{organization_id}"
+            params={"page": page, "per_page": per_page, "contact_type": "vendor"},
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_get_bills(
-        ctx,
-        organization_id: str,
         page: int = 1,
-        per_page: int = 200
+        per_page: int = 200,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Get bills from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            page: Page number (default: 1)
-            per_page: Records per page (default: 200)
-        
-        Returns:
-            Dict containing bills data
-        """
-        params = {
-            'page': page,
-            'per_page': per_page
-        }
-        
+        """Get bills from Zoho Books."""
         return api_router.make_request(
             app_name="Books",
             endpoint="bills",
             method="GET",
-            params=params,
-            additional_path=f"organization/{organization_id}"
+            params={"page": page, "per_page": per_page},
+            additional_path=_org_path(organization_id),
         )
-    
+
     @mcp.tool()
     def books_get_expenses(
-        ctx,
-        organization_id: str,
         page: int = 1,
-        per_page: int = 200
+        per_page: int = 200,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Get expenses from Zoho Books.
-        
-        Args:
-            organization_id: Zoho Books organization ID
-            page: Page number (default: 1)
-            per_page: Records per page (default: 200)
-        
-        Returns:
-            Dict containing expenses data
-        """
-        params = {
-            'page': page,
-            'per_page': per_page
-        }
-        
+        """Get expenses from Zoho Books."""
         return api_router.make_request(
             app_name="Books",
             endpoint="expenses",
             method="GET",
-            params=params,
-            additional_path=f"organization/{organization_id}"
+            params={"page": page, "per_page": per_page},
+            additional_path=_org_path(organization_id),
         )
-    
+
+    @mcp.tool()
+    def books_get_organizations() -> Dict[str, Any]:
+        """Get the organisations available to the connected Zoho Books account."""
+        return api_router.make_request(
+            app_name="Books", endpoint="organizations", method="GET"
+        )
+
     logger.info("Zoho Books tools registered successfully")

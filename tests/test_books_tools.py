@@ -3,7 +3,7 @@ Unit tests for Zoho Books Tools
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from src.app_registry import AppRegistry
 from src.api_router import APIRouter
 from src.apps.books_tools import register_books_tools
@@ -69,7 +69,7 @@ class TestBooksTools:
         # Call the registered function
         if 'books_get_invoices' in registered_tools:
             books_get_invoices = registered_tools['books_get_invoices']
-            books_get_invoices(None, organization_id="123456", page=1, per_page=50)
+            books_get_invoices(organization_id="123456", page=1, per_page=50)
             
             # Verify the router was called correctly
             mock_router.make_request.assert_called_once()
@@ -100,7 +100,7 @@ class TestBooksTools:
         
         if 'books_get_invoice_by_id' in registered_tools:
             books_get_invoice_by_id = registered_tools['books_get_invoice_by_id']
-            books_get_invoice_by_id(None, organization_id="123456", invoice_id="INV-001")
+            books_get_invoice_by_id(organization_id="123456", invoice_id="INV-001")
             
             call_args = mock_router.make_request.call_args
             
@@ -130,7 +130,7 @@ class TestBooksTools:
                 'customer_id': 'CUST-001',
                 'line_items': [{'item_id': 'ITEM-001', 'quantity': 1}]
             }
-            books_create_invoice(None, organization_id="123456", invoice_data=invoice_data)
+            books_create_invoice(organization_id="123456", invoice_data=invoice_data)
             
             call_args = mock_router.make_request.call_args
             
@@ -157,7 +157,7 @@ class TestBooksTools:
         
         if 'books_get_customers' in registered_tools:
             books_get_customers = registered_tools['books_get_customers']
-            books_get_customers(None, organization_id="123456")
+            books_get_customers(organization_id="123456")
             
             call_args = mock_router.make_request.call_args
             
@@ -183,7 +183,7 @@ class TestBooksTools:
         
         if 'books_get_vendors' in registered_tools:
             books_get_vendors = registered_tools['books_get_vendors']
-            books_get_vendors(None, organization_id="123456")
+            books_get_vendors(organization_id="123456")
             
             call_args = mock_router.make_request.call_args
             

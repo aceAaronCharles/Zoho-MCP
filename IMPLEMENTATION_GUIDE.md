@@ -1,194 +1,379 @@
-# Quote Preview Implementation Guide
+# P&L Analysis Page - Implementation Guide
 
 ## Overview
-This solution creates an **editable** quote preview that combines Deal data with Move_Types content in the Quotes module, without requiring Zoho Writer.
+
+This guide provides step-by-step instructions to implement the P&L Analysis feature in your Operations Apps Zoho Creator application.
+
+---
+
+## Prerequisites
+
+✅ Access to Operations Apps in Zoho Creator  
+✅ Admin or Developer permissions  
+✅ Existing forms: Job_Details, Job_Completion_Form, Job_and_receipts, Costing, Material_Use, Materials_Returns  
+✅ Basic understanding of Zoho Creator and Deluge scripting  
 
 ---
 
 ## Implementation Steps
 
-### Step 1: Add Custom Field to Quotes Module
+### Phase 1: Create P&L Form (30 minutes)
 
-1. Go to **Setup** (⚙️ icon) > **Customization** > **Modules and Fields**
-2. Select **Quotes** module
-3. Click **New Field** and create:
-   - **Field Label**: `Quote Preview` (or `Quotation Content`)
-   - **Field Type**: `Multi Line` with **Rich Text Editor**
-   - **API Name**: `Quote_Preview`
-   - Click **Save**
+#### Step 1.1: Create the Form
 
-4. Drag the new field to your Quote layout where users should edit it
+1. Log into Zoho Creator
+2. Open **Operations Apps**
+3. Click **Forms** → **Create New Form**
+4. Enter Form Name: `PL_Analysis`
+5. Display Name: `P&L Analysis`
+6. Click **Create**
+
+#### Step 1.2: Add Fields
+
+Follow the detailed field configuration in:
+📄 `implementation_scripts/01_pl_form_structure.md`
+
+**Quick Field List:**
+1. Job_Card_Number (Lookup)
+2. Service_Type (Single Line)
+3. Client_Name (Single Line)
+4. Completion_Date (Date)
+5. Total_Revenue (Decimal)
+6. Move_Expenses (Decimal)
+7. Material_Costs (Decimal)
+8. Other_Costs (Decimal)
+9. Total_Costs (Formula)
+10. Profit_Loss (Formula)
+11. Profit_Margin (Formula)
+12. Revenue_Details (Multi-line)
+13. Cost_Details (Multi-line)
+14. Created_By (User)
+15. Created_Time (DateTime)
+16. Last_Updated (DateTime)
+
+#### Step 1.3: Configure Formula Fields
+
+**Total_Costs Formula:**
+```
+Move_Expenses + Material_Costs + Other_Costs
+```
+
+**Profit_Loss Formula:**
+```
+Total_Revenue - Total_Costs
+```
+
+**Profit_Margin Formula:**
+```
+if(Total_Revenue > 0, (Profit_Loss / Total_Revenue) * 100, 0)
+```
+
+#### Step 1.4: Set Up Field Rules
+
+**Color Coding for Profit/Loss:**
+- If `Profit_Loss > 0` → Green
+- If `Profit_Loss < 0` → Red
+- If `Profit_Loss == 0` → Gray
+
+**Color Coding for Profit_Margin:**
+- Same rules as Profit/Loss
+
+#### Step 1.5: Save and Test
+
+1. Click **Save**
+2. Click **Access this Form**
+3. Create a test record manually
+4. Verify formulas calculate correctly
+5. Verify color coding works
 
 ---
 
-### Step 2: Identify the Move_Types Connection
+### Phase 2: Create P&L Calculation Workflow (45 minutes)
 
-You need to determine how Move_Types connects to Quotes/Deals:
+#### Step 2.1: Create Workflow
 
-**Check in your CRM:**
-- Does the **Deal** have a lookup field to Move_Types?
-- Does the **Quote** have a lookup field to Move_Types?
-- What is the API name of that field?
+1. Go to **Workflows** in Operations Apps
+2. Click **Create New Workflow**
+3. Name: `Generate_PL_Analysis`
+4. Description: `Automatically generate P&L analysis when job is completed`
+5. Trigger: **On Submit** of **Job_Completion_Form**
 
-**Once you know the field name, update line 30 or 33 in the workflow script accordingly.**
+#### Step 2.2: Add Workflow Script
 
----
-
-### Step 3: Create the Workflow Rule
-
-1. Go to **Setup** > **Automation** > **Workflow Rules**
-2. Click **Create Rule**
-3. Configure:
-   - **Module**: Quotes
-   - **Rule Name**: `Auto-Generate Quote Preview`
-   - **Description**: `Automatically generates editable quote preview from Deal and Move_Types data`
-
-4. **When**: Choose one of these triggers:
-   - ✅ **On Create** - Generates preview when Quote is first created
-   - ✅ **On Create or Edit** - Regenerates whenever Quote is updated
-   - ✅ **On Field Update** - Only when specific fields change (e.g., Deal_Name field)
-
-5. **Condition**: (Optional) Add condition if needed, e.g.:
-   ```
-   Deal_Name is not empty
-   ```
-
-6. Click **Next**
-
----
-
-### Step 4: Add the Custom Function Action
-
-1. Under **Instant Actions**, click **Custom Function**
-2. Click **New Function**
-3. **Function Name**: `GenerateQuotePreview`
-4. **Copy the entire code from `quote_preview_workflow.deluge`** into the function editor
-5. **IMPORTANT**: Update line 30 with your actual Move_Types lookup field name:
+1. In the workflow editor, click **Add Action** → **Custom Function**
+2. Copy the entire script from:
+   📄 `implementation_scripts/02_pl_calculation_workflow.deluge`
+3. Paste into the custom function editor
+4. **Important:** Update the following line with your actual operations email:
    ```deluge
-   moveTypeId = dealInfo.get("YOUR_ACTUAL_FIELD_NAME_HERE");
-   ```
-   OR if Move_Types is connected to Quote (line 33):
-   ```deluge
-   moveTypeId = quote.get("YOUR_ACTUAL_FIELD_NAME_HERE");
+   operations_email = "operations@taylorsolutions.com";
    ```
 
-6. Click **Save** and **Associate** the function with the workflow
-7. **Save** the workflow rule
+#### Step 2.3: Test Workflow
+
+1. Save the workflow
+2. Go to **Job_Completion_Form**
+3. Complete a test job
+4. Check if:
+   - P&L record is created in PL_Analysis form
+   - Email notification is sent
+   - Calculations are accurate
 
 ---
 
-### Step 5: Test the Implementation
+### Phase 3: Create P&L Report (20 minutes)
 
-1. **Create a new Quote** or **edit an existing Quote** linked to a Deal
-2. Check if the `Quote_Preview` field is automatically populated with:
-   - Deal information table (Deal Name, Origin, Destination)
-   - Quote Main Body content
-   - Quote Bottom Body content
+#### Step 3.1: Create List Report
 
-3. **Try editing** the content in the Quote_Preview field - it should be fully editable!
+1. Go to **Reports** → **Create New Report**
+2. Select **PL_Analysis** form
+3. Report Name: `PL_Analysis_Report`
+4. Display Name: `P&L Analysis Report`
+5. Report Type: **List Report**
+
+#### Step 3.2: Add Columns
+
+Add the following columns in order:
+1. Job_Card_Number
+2. Service_Type
+3. Client_Name
+4. Completion_Date
+5. Total_Revenue
+6. Total_Costs
+7. Profit_Loss (with color coding)
+8. Profit_Margin (with color coding)
+
+#### Step 3.3: Configure Filters
+
+Add filters for:
+- Date Range (Completion_Date)
+- Service Type
+- Client Name
+- Profit/Loss (Positive/Negative)
+
+#### Step 3.4: Set Default Sorting
+
+- Sort by: Completion_Date
+- Order: Descending (newest first)
+
+#### Step 3.5: Save Report
+
+1. Click **Save**
+2. Click **Access this Report**
+3. Verify data displays correctly
 
 ---
 
-## How It Works
+### Phase 4: Integrate with Existing Reports (15 minutes)
 
-```
-┌─────────────┐
-│   Deal      │ (Source: Deal_Name, Origin_Town, etc.)
-└──────┬──────┘
-       │
-       │ Related to
-       ▼
-┌─────────────┐
-│   Quote     │ ◄── Workflow triggers here
-└──────┬──────┘
-       │
-       │ Fetches data from
-       ▼
-┌─────────────┐
-│ Move_Types  │ (Source: Quote_Main_Body, Quote_Bottom_Body)
-└──────┬──────┘
-       │
-       │ Combines all data
-       ▼
-┌─────────────────────────────┐
-│  Quote_Preview Field        │ ← User can edit this!
-│  (Rich-Text, Editable)      │
-└─────────────────────────────┘
-```
+#### Step 4.1: Modify "Jobs completed and docs tracked" Report
+
+1. Open the report: `All_Job_Completions`
+2. Click **Edit Report**
+3. Add a new column: **View_PL**
+4. Column Type: **Formula**
+5. Formula:
+   ```
+   "<a href='#Report:PL_Analysis_Report?Job_Card_Number=" + Job_Card_Number1 + "' target='_blank'>View P&L</a>"
+   ```
+6. Save the report
 
 ---
 
-## Customization Options
+### Phase 5: Create Custom P&L Page (Optional - 2 hours)
 
-### Add More Deal Fields to the Table
+This is an advanced feature that creates a beautiful custom page with charts.
 
-In the workflow script, add more rows to the table:
+#### Step 5.1: Create HTML Page
 
-```deluge
-quotationHTML = quotationHTML + "<tr>";
-quotationHTML = quotationHTML + "<td style='padding: 12px; border: 1px solid #ddd; font-weight: bold;'>Contact Person:</td>";
-quotationHTML = quotationHTML + "<td style='padding: 12px; border: 1px solid #ddd;'>" + ifnull(dealInfo.get("Contact_Name"), "") + "</td>";
-quotationHTML = quotationHTML + "</tr>";
+1. Go to **Pages** → **Create New Page**
+2. Page Type: **HTML Page**
+3. Page Name: `PL_Detail_Page`
+4. Copy template from design document
+
+#### Step 5.2: Add Chart.js Library
+
+Include in page header:
+```html
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 ```
 
-### Change Table Styling
+#### Step 5.3: Implement Page Logic
 
-Modify the style attributes in the HTML generation section (lines 60-93):
-- Colors: Change `#2c3e50`, `#f8f9fa`, etc.
-- Padding: Adjust `padding: 12px`
-- Borders: Modify `border: 1px solid #ddd`
+Follow the detailed design in:
+📄 `.kiro/specs/pl-analysis-page/design.md` (Section 3)
 
-### Add Company Logo
+---
 
-Add at the top of the HTML (after line 60):
+## Testing Checklist
 
-```deluge
-quotationHTML = quotationHTML + "<div style='text-align: center; margin-bottom: 20px;'>";
-quotationHTML = quotationHTML + "<img src='YOUR_LOGO_URL' style='max-width: 200px;' />";
-quotationHTML = quotationHTML + "</div>";
-```
+### Test 1: Form Creation
+- [ ] PL_Analysis form exists
+- [ ] All 16 fields are present
+- [ ] Formula fields calculate correctly
+- [ ] Color coding works
+
+### Test 2: Workflow Execution
+- [ ] Workflow triggers on job completion
+- [ ] P&L record is created/updated
+- [ ] Revenue calculation is accurate
+- [ ] Cost calculation is accurate
+- [ ] Profit/Loss is correct
+- [ ] Margin percentage is correct
+- [ ] Email notification is sent
+
+### Test 3: Report Display
+- [ ] P&L report shows all records
+- [ ] Filters work correctly
+- [ ] Sorting works correctly
+- [ ] Color coding displays properly
+- [ ] Link from Jobs completed report works
+
+### Test 4: Edge Cases
+- [ ] Job with no receipts (zero revenue)
+- [ ] Job with no expenses (zero costs)
+- [ ] Job with material returns
+- [ ] Job with multiple receipts
+- [ ] Job with multiple expenses
 
 ---
 
 ## Troubleshooting
 
-### Preview Not Generating?
+### Issue: Workflow doesn't trigger
 
-1. Check workflow execution logs: **Setup** > **Automation** > **Workflow Rules** > View logs
-2. Verify the Move_Types field name is correct (line 30/33)
-3. Ensure the Quote is actually related to a Deal
-4. Check field permissions - make sure workflow has access to all fields
+**Solution:**
+1. Check workflow is enabled
+2. Verify trigger is set to "On Submit" of Job_Completion_Form
+3. Check workflow execution logs
 
-### Preview Not Editable?
+### Issue: Calculations are incorrect
 
-1. Verify `Quote_Preview` field type is **Rich Text Editor**
-2. Check field-level security: **Setup** > **Security Control** > **Field Permissions**
-3. Ensure user profile has edit permission for this field
+**Solution:**
+1. Verify field names match exactly in the script
+2. Check that Job_Card_Number field is populated
+3. Review workflow logs for errors
+4. Test with a simple job with known values
 
-### Deal Fields Showing Empty?
+### Issue: Email not sent
 
-1. Verify API names match exactly (case-sensitive):
-   - `Origin_Town`, `Destination_Town`, `Origin_Street`, `Destination_Street`
-2. Check if Deal actually has data in these fields
-3. Test with `info` statements to debug:
-   ```deluge
-   info "Origin Town: " + originTown;
-   ```
+**Solution:**
+1. Update `operations_email` variable with correct email
+2. Check Zoho Creator email sending limits
+3. Verify email address is valid
+4. Check spam folder
+
+### Issue: P&L record not created
+
+**Solution:**
+1. Check PL_Analysis form permissions
+2. Verify Job_Card_Number lookup is configured correctly
+3. Review workflow logs for error messages
+4. Check if record already exists (workflow updates existing)
+
+---
+
+## Post-Implementation Tasks
+
+### 1. Generate Historical P&L Data
+
+For existing completed jobs, you can run the workflow manually:
+
+1. Go to **Workflows** → `Generate_PL_Analysis`
+2. Click **Execute Workflow**
+3. Select completed jobs
+4. Run workflow for each job
+
+### 2. Train Operations Team
+
+1. Schedule training session
+2. Demonstrate how to view P&L data
+3. Explain how to interpret metrics
+4. Answer questions
+
+### 3. Monitor Performance
+
+For the first week:
+- Check workflow execution daily
+- Verify calculations are accurate
+- Gather user feedback
+- Fix any issues promptly
+
+---
+
+## Maintenance
+
+### Weekly Tasks
+- Review P&L calculation accuracy
+- Check for failed workflows
+- Monitor email delivery
+
+### Monthly Tasks
+- Analyze P&L trends
+- Update benchmarks
+- Optimize performance
+
+### Quarterly Tasks
+- Review user feedback
+- Implement enhancements
+- Update documentation
+
+---
+
+## Support
+
+### Documentation
+- Requirements: `.kiro/specs/pl-analysis-page/requirements.md`
+- Design: `.kiro/specs/pl-analysis-page/design.md`
+- Tasks: `.kiro/specs/pl-analysis-page/tasks.md`
+
+### Scripts
+- Form Structure: `implementation_scripts/01_pl_form_structure.md`
+- Workflow Script: `implementation_scripts/02_pl_calculation_workflow.deluge`
+
+### Contact
+For issues or questions:
+- Check Zoho Creator documentation
+- Review workflow execution logs
+- Contact Zoho Creator support
+
+---
+
+## Success Criteria
+
+✅ P&L form created with all fields  
+✅ Workflow generates P&L on job completion  
+✅ Calculations are accurate  
+✅ Email notifications work  
+✅ Reports display correctly  
+✅ Operations team can access and understand data  
+✅ No performance issues  
+
+---
+
+## Estimated Timeline
+
+| Phase | Task | Time |
+|-------|------|------|
+| 1 | Create P&L Form | 30 min |
+| 2 | Create Workflow | 45 min |
+| 3 | Create Report | 20 min |
+| 4 | Integrate Reports | 15 min |
+| 5 | Testing | 30 min |
+| **Total** | **Basic Implementation** | **2.5 hours** |
+| 6 | Custom Page (Optional) | 2 hours |
+| 7 | Historical Data | 1 hour |
+| **Grand Total** | **Complete Implementation** | **5.5 hours** |
 
 ---
 
 ## Next Steps
 
-1. ✅ Implement the custom field
-2. ✅ Set up the workflow
-3. ✅ Test with sample data
-4. 📧 Configure email templates to use `${Quotes.Quote_Preview}` for sending quotes
-5. 📄 Add a custom button to convert Quote_Preview to PDF if needed
+1. ✅ Review this guide completely
+2. ✅ Backup your Operations Apps data
+3. ✅ Start with Phase 1 (Create Form)
+4. ✅ Test each phase before moving to next
+5. ✅ Document any customizations you make
+6. ✅ Train your team once complete
 
----
-
-## Questions?
-
-- What is the API name of the field connecting Move_Types to Deals/Quotes?
-- Do you want to add more fields to the preview?
-- Should the workflow regenerate on every edit, or only on creation?
+**Ready to start? Begin with Phase 1!** 🚀

@@ -3,10 +3,10 @@ Unit tests for API Router
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 import requests
 from src.api_router import APIRouter
-from src.app_registry import AppRegistry, ZohoAppConfig
+from src.app_registry import AppRegistry
 from src.zoho_auth import ZohoAuth
 
 
@@ -56,7 +56,7 @@ class TestAPIRouter:
         app_config = router_crm.registry.get_app_config("CRM")
         url = router_crm._build_url(app_config, "Leads", None)
         
-        assert url == "https://www.zohoapis.com/crm/v2/Leads"
+        assert url == "https://www.zohoapis.com/crm/v2.1/Leads"
     
     def test_build_url_with_additional_path(self, router_books):
         """Test URL building with additional path (like organization_id)."""
@@ -70,16 +70,26 @@ class TestAPIRouter:
         app_config = router_crm.registry.get_app_config("CRM")
         url = router_crm._build_url(app_config, "/Leads", None)
         
-        assert url == "https://www.zohoapis.com/crm/v2/Leads"
+        assert url == "https://www.zohoapis.com/crm/v2.1/Leads"
         assert "//" not in url.replace("https://", "")
     
-    def test_request_disabled_app(self, router_crm):
-        """Test making request to disabled app."""
-        result = router_crm.make_request("Books", "invoices")
-        
-        assert result['status'] == 'error'
-        assert result['error_type'] == 'app_disabled'
-        assert 'Books' in result['message']
+    @patch('src.api_router.requests.get')
+    def test_request_app_outside_declared_scope_is_attempted(self, mock_get, router_crm):
+        """Apps outside the local scope heuristic are still attempted.
+
+        The token may have scopes the heuristic does not know about, so Zoho
+        performs the final authorisation check instead of the server refusing
+        the request.
+        """
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'invoices': []}
+        mock_get.return_value = mock_response
+
+        result = router_crm.make_request("Books", "invoices", params={"organization_id": "1"})
+
+        assert result['status'] == 'success'
+        assert result['app'] == 'Books'
     
     def test_request_nonexistent_app(self, router_crm):
         """Test making request to non-existent app."""
@@ -87,6 +97,33 @@ class TestAPIRouter:
         
         assert result['status'] == 'error'
         assert result['error_type'] == 'app_not_found'
+
+    def test_read_only_mode_blocks_writes(self, mock_auth, registry_with_crm, monkeypatch):
+        """MCP_READ_ONLY=true blocks write methods but allows gets."""
+        monkeypatch.setenv("MCP_READ_ONLY", "true")
+        router = APIRouter(mock_auth, registry_with_crm)
+
+        result = router.make_request("CRM", "Leads", method="POST", data={"data": []})
+        assert result["status"] == "error"
+        assert result["error_type"] == "read_only"
+
+    def test_org_id_moved_to_query(self, router_books):
+        """Books organisation paths become organization_id query parameters."""
+        params = {}
+        remaining = router_books._move_org_id_to_query(
+            "Books", "organization/123456", params
+        )
+        assert remaining is None
+        assert params["organization_id"] == "123456"
+
+    def test_org_id_none_is_dropped_for_discovery(self, router_books):
+        """A missing organisation id must not leak 'organization/None' into the path."""
+        params = {}
+        remaining = router_books._move_org_id_to_query(
+            "Books", "organization/None", params
+        )
+        assert remaining is None
+        assert "organization_id" not in params
     
     @patch('src.api_router.requests.get')
     def test_successful_get_request(self, mock_get, router_crm):

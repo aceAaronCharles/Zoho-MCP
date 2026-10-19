@@ -3,7 +3,7 @@ Unit tests for App Registry
 """
 
 import pytest
-from src.app_registry import AppRegistry, ZohoAppConfig
+from src.app_registry import AppRegistry
 
 
 class TestAppRegistry:
@@ -50,8 +50,8 @@ class TestAppRegistry:
         crm_config = registry.get_app_config("CRM")
         assert crm_config is not None
         assert crm_config.name == "CRM"
-        assert crm_config.api_path == "/crm/v2"
-        assert crm_config.api_version == "v2"
+        assert crm_config.api_path == "/crm/v2.1"
+        assert crm_config.api_version == "v2.1"
         assert crm_config.category == "Sales"
         assert crm_config.enabled is True
         
@@ -114,6 +114,16 @@ class TestAppRegistry:
         assert registry.is_app_enabled("CRM")
         assert registry.is_app_enabled("Books")
         assert registry.is_app_enabled("Projects")
+
+    def test_space_delimited_scopes(self):
+        """Zoho returns token scopes separated by spaces, not commas."""
+        scope = "ZohoCRM.modules.ALL ZohoBooks.fullaccess.all Desk.tickets.ALL"
+        registry = AppRegistry(scope)
+
+        assert len(registry.scopes) == 3
+        assert registry.is_app_enabled("CRM")
+        assert registry.is_app_enabled("Books")
+        assert registry.is_app_enabled("Desk")
     
     def test_partial_scope_matching(self):
         """Test partial scope matching for flexibility."""
@@ -123,6 +133,26 @@ class TestAppRegistry:
         
         # Creator should be enabled with any Creator scope
         assert registry.is_app_enabled("Creator")
+
+    def test_missing_scopes(self):
+        """Report the scopes a grant still needs for each app."""
+        registry = AppRegistry("ZohoCRM.modules.ALL")
+
+        assert registry.missing_scopes("CRM") == []
+        assert registry.missing_scopes("Vault") == ["ZohoVault.secrets.ALL"]
+        assert registry.missing_scopes("NonExistentApp") == []
+
+    def test_scope_report(self):
+        """The scope report includes per-app coverage."""
+        registry = AppRegistry("ZohoCRM.modules.ALL")
+        report = registry.scope_report()
+
+        assert report["granted_scopes"] == ["ZohoCRM.modules.ALL"]
+        assert report["apps"]["CRM"]["enabled"] is True
+        assert report["apps"]["Vault"]["enabled"] is False
+        assert report["apps"]["Vault"]["missing_scopes"] == [
+            "ZohoVault.secrets.ALL"
+        ]
     
     def test_app_config_to_dict(self):
         """Test converting app config to dictionary."""
@@ -134,9 +164,9 @@ class TestAppRegistry:
         
         assert isinstance(config_dict, dict)
         assert config_dict['name'] == "CRM"
-        assert config_dict['api_path'] == "/crm/v2"
+        assert config_dict['api_path'] == "/crm/v2.1"
         assert config_dict['enabled'] is True
-        assert config_dict['api_version'] == "v2"
+        assert config_dict['api_version'] == "v2.1"
         assert config_dict['category'] == "Sales"
 
 

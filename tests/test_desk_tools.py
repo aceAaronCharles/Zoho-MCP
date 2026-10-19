@@ -41,7 +41,7 @@ class TestDeskTools:
         
         if 'desk_get_tickets' in registered_tools:
             desk_get_tickets = registered_tools['desk_get_tickets']
-            desk_get_tickets(None, status="Open", page=1, per_page=50)
+            desk_get_tickets(status="Open", page=1, per_page=50)
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Desk"
@@ -68,7 +68,7 @@ class TestDeskTools:
         if 'desk_create_ticket' in registered_tools:
             desk_create_ticket = registered_tools['desk_create_ticket']
             ticket_data = {'subject': 'Test Ticket', 'description': 'Test description'}
-            desk_create_ticket(None, ticket_data=ticket_data)
+            desk_create_ticket(ticket_data=ticket_data)
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Desk"
@@ -93,7 +93,7 @@ class TestDeskTools:
         
         if 'desk_add_comment' in registered_tools:
             desk_add_comment = registered_tools['desk_add_comment']
-            desk_add_comment(None, ticket_id="12345", comment="Test comment", is_public=True)
+            desk_add_comment(ticket_id="12345", comment="Test comment", is_public=True)
             
             call_args = mock_router.make_request.call_args
             assert call_args[1]['app_name'] == "Desk"

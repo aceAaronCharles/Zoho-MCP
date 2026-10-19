@@ -1,13 +1,12 @@
-# Environment variables
+# Environment variables and secrets
 .env
-.env.personal
-
-# Token storage
+.env.*
+!.env.example
 .zoho_tokens.json
+*.tokens.json
 
-# Logs
-logs/
-*.log
+# Node dependencies (the TypeScript prototype is deprecated)
+node_modules/
 
 # Python
 __pycache__/
@@ -42,6 +41,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Logs
+logs/
+*.log
+
 # IDE
 .vscode/
 .idea/
@@ -55,3 +58,14 @@ Thumbs.db
 
 # MCP
 .mcp_cache/
+
+# Connection portal database (contains encrypted credentials)
+portal.db
+portal.db-*
+*.sqlite
+*.sqlite3
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

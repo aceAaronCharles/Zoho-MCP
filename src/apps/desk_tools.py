@@ -18,15 +18,11 @@ def register_desk_tools(mcp, api_router, app_registry):
         api_router: APIRouter instance
         app_registry: AppRegistry instance
     """
-    if not app_registry.is_app_enabled("Desk"):
-        logger.info("Zoho Desk is not enabled, skipping Desk tools registration")
-        return
     
     logger.info("Registering Zoho Desk tools")
     
     @mcp.tool()
     def desk_get_tickets(
-        ctx,
         status: str = None,
         page: int = 1,
         per_page: int = 100
@@ -59,7 +55,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_get_ticket_by_id(
-        ctx,
         ticket_id: str
     ) -> Dict[str, Any]:
         """
@@ -79,7 +74,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_create_ticket(
-        ctx,
         ticket_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
@@ -100,7 +94,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_update_ticket(
-        ctx,
         ticket_id: str,
         ticket_data: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -123,7 +116,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_add_comment(
-        ctx,
         ticket_id: str,
         comment: str,
         is_public: bool = True
@@ -153,7 +145,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_get_contacts(
-        ctx,
         page: int = 1,
         per_page: int = 100
     ) -> Dict[str, Any]:
@@ -181,7 +172,6 @@ def register_desk_tools(mcp, api_router, app_registry):
     
     @mcp.tool()
     def desk_get_ticket_comments(
-        ctx,
         ticket_id: str
     ) -> Dict[str, Any]:
         """

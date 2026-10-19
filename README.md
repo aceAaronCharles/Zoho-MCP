@@ -12,17 +12,17 @@
 
 ---
 
-A comprehensive **Model Context Protocol (MCP) server** for seamless integration with **40+ Zoho applications**. This server enables AI assistants like Claude to interact with your entire Zoho ecosystem through a secure, OAuth-based authentication system.
+A comprehensive **Model Context Protocol (MCP) server** for seamless integration with **46 Zoho applications**. This server enables AI assistants like Claude to interact with your entire Zoho ecosystem through a secure, OAuth-based authentication system.
 
 **Free & Open Source** - Built with ❤️ by the team at [JunnAI](https://junnaisystem.com)
 
 ## 🎯 Supported Zoho Apps
 
-This MCP server supports **40+ Zoho applications** across all major business categories:
+This MCP server supports **46 Zoho applications** across all major business categories:
 
-### Currently Implemented (9 apps)
+### Dedicated tools (9 apps)
 - ✅ **CRM** - Customer relationship management
-- ✅ **Books** - Accounting and invoicing  
+- ✅ **Books** - Accounting and invoicing
 - ✅ **Projects** - Project management
 - ✅ **Desk** - Customer support ticketing
 - ✅ **People** - HR management
@@ -31,22 +31,34 @@ This MCP server supports **40+ Zoho applications** across all major business cat
 - ✅ **Analytics** - Business intelligence
 - ✅ **Creator** - Custom applications
 
-### Available (30+ more apps)
-**Sales & Marketing**: SalesIQ, Campaigns, Social, Forms, Survey  
-**Finance**: Invoice, Expense, Subscriptions, Commerce  
-**Collaboration**: Connect, Cliq, Meeting, Assist  
-**Productivity**: Mail, WorkDrive, Writer, Sheet, Show  
-**Operations**: Fleet, FSM, Bookings  
-**Developer**: Flow, Catalyst  
-**Legal**: Sign, Contracts  
-**IoT**: IoT Platform
+### Full catalog (46 apps)
 
-*See [ZOHO_APPS_COMPLETE_LIST.md](.kiro/specs/multi-app-support/ZOHO_APPS_COMPLETE_LIST.md) for the complete list*
+Every app is reachable through the generic `zoho_api_request` tool; the nine
+apps above also have convenience tools. The catalog is defined in
+[`src/zoho_apps.py`](src/zoho_apps.py):
+
+**Sales & Marketing**: SalesIQ, Bookings, Campaigns, Social, Forms, Survey,
+MarketingHub, PageSense  
+**Finance & Commerce**: Books, Invoice, Expense, Inventory, Subscriptions,
+Commerce  
+**Customer Service**: Desk, Assist  
+**HR & Recruitment**: People, Recruit, Payroll  
+**Project Management**: Projects, Sprints, BugTracker, Practice  
+**Collaboration**: Connect, Cliq, Meeting, Calendar  
+**Email, Storage & Productivity**: Mail, TeamInbox, WorkDrive, Writer, Sheet,
+Show, Learn  
+**Analytics & Developer**: Analytics, Creator, Flow, Catalyst  
+**Operations**: Fleet, FSM  
+**Legal, Security & Admin**: Sign, Contracts, Vault, Directory  
+**IoT**: IoT
+
+`list_zoho_apps()` returns the live catalog with each app's base URL, API path,
+required scopes, and any `missing_scopes` for the current grant.
 
 ## ✨ Features
 
 - **🔐 Secure OAuth Authentication** - Full OAuth 2.0 flow with automatic token refresh
-- **🌐 Multi-App Support** - Access 40+ Zoho applications through a single MCP server
+- **🌐 Multi-App Support** - Access 46 Zoho applications through a single MCP server
 - **📊 Complete Operations** - Create, read, update, delete records across all apps
 - **🔍 Advanced Search** - Powerful search and filtering capabilities across apps
 - **📈 Business Intelligence** - Access Analytics, reports, and dashboards
@@ -55,13 +67,14 @@ This MCP server supports **40+ Zoho applications** across all major business cat
 - **📱 Cross-App Integration** - Seamlessly work across multiple Zoho services
 - **⚡ Real-time Token Management** - Automatic token refresh and error handling
 - **📝 Comprehensive Logging** - Detailed logging for debugging and monitoring
-- **🧩 Modular Architecture** - Only loads tools for apps you have access to
+- **🧩 Complete Tool Surface** - Every tool is always registered; calls the token is not authorised for return a clear Zoho error
+- **🛰️ Hosting Ready** - Run locally over stdio, or host the streamable HTTP transport behind bearer auth
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.11 or higher
 - Zoho CRM account with API access
 - Claude Pro subscription (for AI integration)
 
@@ -135,11 +148,11 @@ Tell your AI assistant:
 ```
 I have a Zoho Ecosystem MCP server ready to use. Here are the details:
 
-Path to MCP Server: /path/to/your/zoho-crm-mcp/src/server.py
+Path to MCP Server: /path/to/your/zoho-mcp/src/server.py
 
 Please use this MCP server to help me work with my Zoho data across multiple apps. 
-Start by running list_enabled_apps() to see which Zoho apps are available,
-then authenticate_zoho() to connect to my Zoho account.
+Start by running get_configuration_status() to confirm credentials are loaded,
+then list_zoho_apps() to see every supported Zoho app.
 ```
 
 #### For Claude Desktop Users:
@@ -151,10 +164,12 @@ Add this to your Claude Desktop MCP configuration:
   "mcpServers": {
     "zoho-ecosystem": {
       "command": "python",
-      "args": ["/path/to/your/zoho-crm-mcp/src/server.py"],
+      "args": ["/path/to/your/zoho-mcp/src/server.py"],
       "env": {
         "ZOHO_CLIENT_ID": "your_client_id_here",
-        "ZOHO_CLIENT_SECRET": "your_client_secret_here"
+        "ZOHO_CLIENT_SECRET": "your_client_secret_here",
+        "ZOHO_REFRESH_TOKEN": "your_refresh_token_here",
+        "ZOHO_SCOPE": "all"
       }
     }
   }
@@ -163,13 +178,217 @@ Add this to your Claude Desktop MCP configuration:
 
 #### First-Time Setup:
 
-On first use, the server will:
-1. Detect which Zoho apps you have access to based on your OAuth scopes
-2. Open your web browser for Zoho authentication
-3. Redirect you to Zoho's login page
-4. After successful login, redirect back to the server
-5. Store authentication tokens securely for future use
-6. Load only the tools for apps you have enabled
+With `ZOHO_REFRESH_TOKEN` set (the recommended headless setup), the server
+loads credentials immediately and never opens a browser. If you only have a
+client ID and secret, run the interactive flow once with
+`ZOHO_INTERACTIVE_AUTH=true` to create the token file, then copy the
+`ZOHO_REFRESH_TOKEN` from `.zoho_tokens.json` into your environment.
+
+The server always registers every tool, even before credentials are
+configured, so an MCP client can discover them and receive an actionable setup
+error from `get_configuration_status()`.
+
+## 🔑 Obtaining a refresh token (recommended)
+
+1. In the [Zoho API console](https://api-console.zoho.com/) create a
+   **Server-based Application** and add the scopes you need, or use
+   `ZOHO_SCOPE=all` and grant full access during consent.
+2. Build a consent URL (replace the placeholders):
+
+   ```
+   https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.ALL,ZohoBooks.fullaccess.all,Desk.tickets.ALL,ZohoProjects.projects.ALL&client_id=CLIENT_ID&response_type=code&access_type=offline&redirect_uri=http://localhost:8080/callback
+   ```
+
+   Add `&prompt=consent` to force Zoho to return a refresh token.
+3. Approve access. Zoho redirects to your redirect URI with a `code`
+   parameter.
+4. Exchange the code once:
+
+   ```bash
+   ZOHO_AUTH_CODE=<code> python manual_exchange.py
+   ```
+
+   Or run the server with `ZOHO_INTERACTIVE_AUTH=true` and the built-in
+   callback listener.
+5. Copy the `refresh_token` from `.zoho_tokens.json` into `ZOHO_REFRESH_TOKEN`
+   and keep it secret. It does not expire, but it can be revoked.
+
+### Enabling every app
+
+`ZOHO_SCOPE=all` expands to the scopes for all 46 catalog apps. A refresh token
+keeps the scopes it was granted with, so after changing `ZOHO_SCOPE` you must
+re-consent:
+
+- **Local / stdio**: set `ZOHO_SCOPE=all`, then call
+  `authenticate_zoho(scopes="all", force=True)` from your MCP client. It opens
+  the browser, runs the callback listener, and reloads the registry.
+- **Hosted portal**: open `/portal`, use **Re-authorize**, and keep `Scopes` set
+  to `all` (or `recommended`).
+- **Manual**: call `get_zoho_authorization_url(scopes="all")` to get a consent
+  URL, then exchange the code as above.
+
+If Zoho rejects the consent with `invalid_scope`, use
+`ZOHO_SCOPE=recommended` (the validated 23-scope core set) or trim specific
+scopes with `ZOHO_SCOPE_EXCLUDE=Scope.One,Scope.Two`. Apps always appear in the
+catalog; scopes only control whether your token can call them.
+
+## 🌐 Hosting over HTTP
+
+Set `MCP_TRANSPORT=http` to serve the streamable HTTP transport (useful for
+remote hosts and containers). When binding to anything other than loopback you
+must either set `MCP_HTTP_TOKEN` **or** enable the connection portal; the server
+refuses to start with neither.
+
+```bash
+MCP_TRANSPORT=http \
+MCP_HOST=0.0.0.0 \
+MCP_PORT=8000 \
+MCP_HTTP_TOKEN=$(openssl rand -hex 32) \
+python -m src.server
+```
+
+Clients must send `Authorization: Bearer <MCP_HTTP_TOKEN>` on every request.
+`GET /health` is public and returns `{"status":"ok"}`. A `Dockerfile` and
+`docker-compose.yml` are included for container hosting.
+
+Set `MCP_READ_ONLY=true` to block every write operation (POST/PUT/PATCH/DELETE)
+while still allowing reads.
+
+## 🔐 Multi-tenant connection portal (hosted setup UI)
+
+For a hosted deployment where **each user connects their own Zoho account**, the
+server ships a setup portal on the same port as the MCP endpoint. Users sign in
+with OIDC, bring their own Zoho client ID/secret, connect Zoho once, and receive
+a personal MCP API key.
+
+```
+User ──OIDC──▶ /portal ──▶ Zoho OAuth ──▶ encrypted tokens in SQLite
+                                            │
+MCP client ──Bearer <personal API key>──▶ /mcp ──▶ that user's Zoho connection
+```
+
+Everything below is optional: without `PORTAL_ENABLED=true` the server behaves
+exactly as before (stdio, or HTTP with a shared `MCP_HTTP_TOKEN`).
+
+### 1. Configure the portal
+
+```bash
+PORTAL_ENABLED=true
+PORTAL_BASE_URL=https://zoho.example.com
+PORTAL_DB_PATH=/data/portal.db
+MCP_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))")
+
+# OIDC identity provider (any issuer with /.well-known/openid-configuration)
+PORTAL_OIDC_ISSUER=https://accounts.google.com
+PORTAL_OIDC_CLIENT_ID=...
+PORTAL_OIDC_CLIENT_SECRET=...
+PORTAL_OIDC_NAME=Google
+```
+
+Register `https://zoho.example.com/portal/auth/callback` with the identity
+provider. Google, Microsoft Entra, Okta, Auth0, and Keycloak all work; GitHub is
+plain OAuth2, not OIDC, so it is not supported by the generic client.
+
+`MCP_SECRET_KEY` encrypts every stored Zoho secret and token with Fernet. **Back
+it up**: without it the database cannot be decrypted. The server refuses to
+start with the portal enabled and no key.
+
+### 2. Start the server and open the portal
+
+```bash
+MCP_TRANSPORT=http MCP_HOST=0.0.0.0 MCP_PORT=8000 python -m src.server
+```
+
+Open `https://zoho.example.com/portal`. Each user:
+
+1. Signs in with the identity provider.
+2. Creates a **Server-based Application** in the
+   [Zoho API Console](https://api-console.zoho.com/) and sets the authorized
+   redirect URI to `https://zoho.example.com/oauth/zoho/callback`.
+3. Pastes their client ID/secret, chooses the data centre and scopes
+   (`all` by default), and authorizes Zoho.
+4. Creates an MCP API key (shown once) and uses it as
+   `Authorization: Bearer zoho_...` in their MCP client.
+
+Point the MCP client at `https://zoho.example.com/mcp` with that header. Each
+key resolves to its owner's Zoho connection, and the tool list adapts to the
+scopes that account actually granted.
+
+### Running the portal locally
+
+For local testing you can skip the identity provider:
+
+```bash
+PORTAL_ENABLED=true PORTAL_DEV_LOGIN=true \
+MCP_SECRET_KEY=dev-only-secret \
+MCP_TRANSPORT=http MCP_HOST=127.0.0.1 PORTAL_BASE_URL=http://127.0.0.1:8000 \
+python -m src.server
+```
+
+Then open <http://127.0.0.1:8000/portal>. Never enable `PORTAL_DEV_LOGIN` on a
+public deployment.
+
+### Security notes
+
+* `MCP_SECRET_KEY` and the portal database are as sensitive as a password vault.
+  Keep both on a private volume and out of version control.
+* Portal sessions are HMAC-signed, `HttpOnly`, `SameSite=Lax` cookies. Mutating
+  forms reject cross-origin submissions.
+* MCP sessions are bound to the API key that created them; a different key
+  cannot reuse an existing session.
+* A shared `MCP_HTTP_TOKEN` (if set) still works and maps to the process-wide
+  `ZOHO_*` connection. Use it only for single-tenant deployments.
+* The portal supports one Zoho connection per user; reconnecting replaces it.
+
+### Production deployment checklist
+
+Before exposing the server publicly:
+
+* **Terminate TLS in front of it** (nginx, Caddy, a load balancer, or the
+  platform ingress). The server speaks plain HTTP; set `PORTAL_BASE_URL` to the
+  public `https://` origin, which also makes the session cookie `Secure`.
+* **Require authentication.** Either `PORTAL_ENABLED=true` (multi-tenant) or
+  `MCP_HTTP_TOKEN=<random>` (single tenant). Binding to `0.0.0.0` without one of
+  these is refused at startup.
+* **Set `MCP_ALLOWED_HOSTS`** to your public host (and `MCP_ALLOWED_ORIGINS` if a
+  browser calls `/mcp`) so DNS-rebinding protection is active.
+* **Use a strong `MCP_SECRET_KEY`** from a secret manager
+  (`python -c "import secrets;print(secrets.token_urlsafe(48))"`). The same key
+  must be used to read an existing `portal.db`; rotating it invalidates every
+  stored connection.
+* **Never set `PORTAL_DEV_LOGIN=true`** in production. Register
+  `https://<host>/portal/auth/callback` with the identity provider and
+  `https://<host>/oauth/zoho/callback` as the Zoho redirect URI.
+* **Rate-limit and size-limit at the proxy** for `/portal/login`, `/portal/keys`
+  and `/mcp` (the app has no built-in rate limiter).
+* **Back up the `portal.db` and token-file volume.** SQLite is a single file per
+  instance, so run one writer and use volume snapshots or `sqlite3 .backup`.
+  For high write concurrency, replace the storage layer with a networked DB.
+* **Pin dependencies** (the image builds from `requirements.txt`) and let CI
+  (`.github/workflows/tests.yml`) gate `mcp`/`starlette` upgrades.
+* **Monitor `/health` and the logs.** A `CryptoError` means `MCP_SECRET_KEY`
+  changed or the database was copied between environments.
+* **Rotate the Zoho client secret and refresh token** in the API console if they
+  were ever committed. The server only reads them from the environment.
+
+## 🧰 Generic access to every Zoho app
+
+Use `zoho_api_request` to call any Zoho REST endpoint, including apps that do
+not have dedicated tools:
+
+```python
+zoho_api_request("Books", "invoices", "GET", {"organization_id": "123"})
+zoho_api_request("Desk", "tickets", "GET", {"limit": 10})
+zoho_api_request("CRM", "Leads", "POST", data={"data": [{"Last_Name": "Doe"}]})
+```
+
+`list_zoho_apps()` returns every configured app, its base URL, API path,
+required scopes, and any `missing_scopes` for the current grant. The `enabled`
+flag reflects the local scope heuristic only; Zoho performs the final
+authorisation check. To grant more scopes, call
+`get_zoho_authorization_url(scopes="all")` and approve the consent, or
+re-authorize through the portal.
+
 
 ### 5. Quick Reference - Available Tools
 
@@ -177,8 +396,10 @@ Once connected, your AI assistant can use these tools:
 
 **System Tools:**
 ```
-• list_enabled_apps() - See which Zoho apps are available
-• authenticate_zoho() - Authenticate with Zoho (opens browser)
+• list_enabled_apps() - See which Zoho apps are enabled for the current grant
+• list_zoho_apps() - Full catalog with base URLs and missing scopes
+• get_zoho_authorization_url(scopes="all") - Consent URL for more scopes
+• authenticate_zoho(scopes=None, force=False) - Authenticate / re-consent
 • revoke_authentication() - Revoke stored tokens
 ```
 
@@ -230,11 +451,16 @@ Once connected, your AI assistant can use these tools:
 - 30+ additional tools for HR, recruitment, inventory, analytics, and custom apps
 - See tool documentation for complete list
 
+**Everything else:**
+- Use `zoho_api_request(app_name, endpoint, method, params, data)` for the
+  remaining catalog apps (Mail, Calendar, WorkDrive, Sign, Bookings, ...)
+
 ## 📚 Available Tools
 
 ### Authentication Tools
 
-- **`authenticate_zoho()`** - Authenticate with Zoho CRM (handles OAuth flow)
+- **`authenticate_zoho(scopes=None, force=False)`** - Authenticate with Zoho (handles OAuth flow); pass `scopes="all", force=True` to re-consent for the full catalog
+- **`get_zoho_authorization_url(scopes="all")`** - Return a consent URL for granting more scopes
 - **`revoke_authentication()`** - Revoke stored authentication tokens
 
 ### Module & Metadata Tools
@@ -318,11 +544,32 @@ result = convert_lead("lead_id_here", convert_data)
 |----------|---------|-------------|
 | `ZOHO_CLIENT_ID` | - | **Required**: Your Zoho app client ID |
 | `ZOHO_CLIENT_SECRET` | - | **Required**: Your Zoho app client secret |
-| `ZOHO_REDIRECT_URI` | `http://localhost:8080/callback` | OAuth redirect URI |
-| `ZOHO_SCOPE` | `ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.ALL` | API permissions scope |
-| `ZOHO_API_DOMAIN` | `https://www.zohoapis.com` | Zoho API base URL |
-| `ZOHO_ACCOUNTS_DOMAIN` | `https://accounts.zoho.com` | Zoho accounts URL |
+| `ZOHO_REFRESH_TOKEN` | - | **Required for headless use**: long-lived refresh token |
+| `ZOHO_REDIRECT_URI` | `http://localhost:8080/callback` | OAuth redirect URI (interactive flow only) |
+| `ZOHO_SCOPE` | `all` | Scope preset (`all`, `recommended`) or an explicit list |
+| `ZOHO_SCOPE_EXCLUDE` | - | Comma/space-separated scopes to drop from a preset |
+| `ZOHO_DC` | `com` | Data centre suffix: `com`, `eu`, `in`, `com.au`, `jp`, `ca`, ... |
+| `ZOHO_API_DOMAIN` | derived from DC | Override the Zoho API base URL |
+| `ZOHO_ACCOUNTS_DOMAIN` | derived from DC | Override the Zoho accounts URL |
+| `ZOHO_DESK_ORG_ID` | auto-discovered | Zoho Desk organisation ID |
+| `ZOHO_ANALYTICS_ORG_ID` | auto-discovered | Zoho Analytics org ID (`ZANALYTICS-ORGID`) |
 | `TOKEN_FILE_PATH` | `.zoho_tokens.json` | Path to store OAuth tokens |
+| `MCP_TRANSPORT` | `stdio` | `stdio` or `http` |
+| `MCP_HTTP_TOKEN` | - | Shared bearer token for single-tenant HTTP (or enable the portal) |
+| `MCP_ALLOWED_HOSTS` | SDK default | Comma-separated Host allow-list for DNS-rebinding protection |
+| `PORTAL_ENABLED` | `false` | Serve the multi-tenant connection portal on the same port |
+| `PORTAL_BASE_URL` | `http://localhost:8000` | Public URL used in links and OAuth callbacks |
+| `PORTAL_DB_PATH` | `portal.db` | SQLite database for users, connections and API keys |
+| `MCP_SECRET_KEY` | - | **Required** when the portal is enabled; encrypts stored Zoho secrets |
+| `PORTAL_SESSION_SECRET` | `MCP_SECRET_KEY` | Signs portal session cookies |
+| `PORTAL_OIDC_ISSUER` | - | OIDC issuer (e.g. `https://accounts.google.com`) |
+| `PORTAL_OIDC_CLIENT_ID` | - | OIDC client ID |
+| `PORTAL_OIDC_CLIENT_SECRET` | - | OIDC client secret |
+| `PORTAL_OIDC_NAME` | `SSO` | Provider name shown on the sign-in page |
+| `PORTAL_COOKIE_SECURE` | auto | Force `Secure` cookies (defaults to on for HTTPS) |
+| `PORTAL_DEV_LOGIN` | `false` | Local-only email sign-in; never enable publicly |
+| `ZOHO_OAUTH_REDIRECT_URI` | `${PORTAL_BASE_URL}/oauth/zoho/callback` | Per-user Zoho callback registered in their API client |
+| `MCP_READ_ONLY` | `false` | Block all write operations when `true` |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `REQUEST_TIMEOUT` | `30` | API request timeout in seconds |
 | `RATE_LIMIT` | `100` | Requests per minute limit |
@@ -330,11 +577,16 @@ result = convert_lead("lead_id_here", convert_data)
 ## 🔒 Security Features
 
 - **OAuth 2.0 Flow**: Secure authentication without exposing passwords
-- **Token Auto-Refresh**: Automatically refreshes expired tokens
-- **Secure Token Storage**: Tokens stored locally and encrypted
+- **Refresh Tokens**: Headless authentication that never stores a password
+- **Token Auto-Refresh**: Automatically refreshes expired access tokens
+- **Owner-Only Token Storage**: Token files are written atomically with `0600` permissions
+- **Read-Only Mode**: `MCP_READ_ONLY=true` blocks every write operation
+- **Bearer-Authenticated HTTP**: Non-loopback HTTP requires `MCP_HTTP_TOKEN` or the portal
+- **Encrypted at rest**: The portal encrypts every stored Zoho client secret and token (Fernet)
+- **Per-user isolation**: Each MCP API key maps to one user's Zoho connection; sessions are bound to their key
+- **No Secret Logging**: Credentials and tokens are never written to logs
 - **Rate Limiting**: Built-in protection against API abuse
 - **Request Timeout**: Prevents hanging requests
-- **Comprehensive Logging**: Track all API interactions
 
 ## 🐛 Troubleshooting
 
@@ -356,6 +608,24 @@ result = convert_lead("lead_id_here", convert_data)
 4. **"Permission denied"**
    - Verify your user has access to the requested module
    - Check if the module is enabled in your CRM
+
+5. **`INVALID_OAUTH_SCOPE` / `SCOPE_MISMATCH` for an app**
+   - The refresh token was created without that app's scope. Re-run the consent
+     flow with the extra scope (or `ZOHO_SCOPE=all`) and replace
+     `ZOHO_REFRESH_TOKEN`. Some apps also require the app to be provisioned on
+     the account (for example Zoho Desk returns `SCOPE_MISMATCH` until
+     `Desk.tickets.ALL` is granted *and* the Desk org exists).
+   - `list_zoho_apps()` shows the local scope heuristic, but Zoho is the final
+     authority; `zoho_api_request` still attempts apps marked disabled.
+
+6. **Desk returns "requires an organisation ID"**
+   - Set `ZOHO_DESK_ORG_ID` (Desk → Setup → Developer Space), or grant
+     `Desk.organizations.READ` so the server can discover it automatically.
+
+7. **Books/Inventory ask for an organisation ID**
+   - Leave `organization_id` empty and the server discovers the first
+     organisation automatically; set it explicitly when the account has more
+     than one.
 
 ### Debug Mode
 
