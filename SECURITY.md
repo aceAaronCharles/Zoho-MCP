@@ -49,6 +49,9 @@ or issues that require an already-compromised host.
   undecryptable, and its loss is unrecoverable by design.
 * The `detect-private-key` pre-commit hook and Dependabot are enabled to catch
   accidental key material and vulnerable dependencies.
+* Third-party GitHub Actions are pinned to full commit SHAs, not mutable tags,
+  so a force-pushed or compromised tag cannot execute in CI. Dependabot still
+  raises version PRs and updates the pins.
 
 ## Hardening checklist for operators
 

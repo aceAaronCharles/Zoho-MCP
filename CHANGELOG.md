@@ -27,7 +27,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   3.11–3.14.
 * GitHub Actions refreshed (checkout, setup-python, buildx, login, metadata)
   and Trivy bumped to `0.36.0`, whose older tag had been removed upstream and
-  was failing every scan job.
+  was failing every scan job. All third-party actions are now pinned to full
+  commit SHAs to defend against mutable-tag supply-chain attacks.
 
 ### Removed
 
