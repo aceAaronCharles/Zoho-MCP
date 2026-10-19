@@ -1,0 +1,45 @@
+# Keep secrets and local state out of the build context.
+.env
+.env.*
+!.env.example
+.zoho_tokens.json
+*.tokens.json
+portal.db
+portal.db-*
+*.sqlite
+*.sqlite3
+
+# Version control and editors
+.git
+.gitignore
+.github
+.kiro
+.vscode
+.idea
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Node (the TypeScript prototype is deprecated)
+node_modules/
+package-lock.json
+
+# Docs, tests, local logs and tooling
+tests/
+logs/
+*.log
+*.md
+!README.md
+deploy/
+Dockerfile
+docker-compose*.yml
